@@ -135,7 +135,7 @@ class nn_q(Qnet):
             loss = criterion(output.float().cpu()*output_s[0], target)
             loss_meter.update(float(loss), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
-                acc = accuracy(output.float()*output_s[0], target)
+                acc = accuracy(output.float().cpu()*output_s[0], target)
                 acc_meter.update(float(acc), inputs.size(0))
 
             time_meter.update(time.time() - start_time)
@@ -219,7 +219,7 @@ class nn_fp(nn.Module):
             loss = criterion(output, target.to(self.device))
             loss_meter.update(float(loss.item()), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
-                acc = accuracy(output, target)
+                acc = accuracy(output.cpu(), target)
                 acc_meter.update(float(acc), inputs.size(0))
             time_meter.update(time.time() - start_time)
             start_time = time.time()
