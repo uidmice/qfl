@@ -72,7 +72,6 @@ def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None, 
                         dataset_cfg[args.dataset]['output_size'], 
                         args)
         model.load_state_dict(torch.load(c.model_path))
-        print(model.dummy_param.device)
 
         
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample)
@@ -108,8 +107,7 @@ def exp(root, config, seed):
     b0 = 4
     global_model = build_fp_model(dataset_cfg[args.dataset]['input_channel'], 
                         dataset_cfg[args.dataset]['input_size'], 
-                        dataset_cfg[args.dataset]['output_size'], args.model, args.lr).to(device)
-    print(global_model.dummy_param.device)
+                        dataset_cfg[args.dataset]['output_size'], args.model, args.lr, args.device).to(device)
     if args.init:
         logging.info("Init weights from: %s", args.init)
         global_model.load_state_dict(torch.load(args.init))

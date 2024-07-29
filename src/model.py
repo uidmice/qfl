@@ -26,11 +26,10 @@ class Qnet(nn.Module):
         super(Qnet, self).__init__()
         self.loss = loss
         self.quantizer = quantizer
-        self.dummy_param = nn.Parameter(torch.empty(0))
 
     def forward(self, x):
         x_data, scale = self.quantizer(x)
-        x = x_data, scale
+        x = x_data.to(self.device), scale
         self.out, self.out_s = self.forward_layers(x)
         return self.out, self.out_s
 
@@ -63,12 +62,13 @@ class Qnet(nn.Module):
 
 class nn_q(Qnet):
     def __init__(self, channel, img_size, out_dim, cfg, loss, 
-                 weight_update, forward_shift, backward_shift, input_quantizer, quantizer, initialize,  use_bias=False):
+                 weight_update, forward_shift, backward_shift, input_quantizer, quantizer, initialize, device, use_bias=False):
         super(nn_q, self).__init__(loss, input_quantizer)
         self.channel = channel
         self.img_size = img_size
         self.out_dim = out_dim
         self.cfg = cfg
+        self.device = device
 
         layers = []
         ldim = 0
@@ -107,7 +107,7 @@ class nn_q(Qnet):
         self.forward_layers = nn.Sequential(*layers)
 
     def dequantize(self):
-        fp_model = nn_fp(self.channel, self.img_size, self.out_dim, self.cfg, bias=self.use_bias)
+        fp_model = nn_fp(self.channel, self.img_size, self.out_dim, self.cfg, self.device, bias=self.use_bias)
         state_dict = self.state_dict()
         new_dict = {}
         for idx,l in enumerate(fp_model.layers):
@@ -157,7 +157,7 @@ class nn_q(Qnet):
 
 
 class nn_fp(nn.Module):
-    def __init__(self, channel, img_size, out_dim, cfg, lr=0.01, momentum=0.9, bias=False):
+    def __init__(self, channel, img_size, out_dim, cfg, device, lr=0.01, momentum=0.9, bias=False):
         super(nn_fp, self).__init__()
         self.channel = channel
         self.img_size = img_size
@@ -165,7 +165,7 @@ class nn_fp(nn.Module):
         self.cfg = cfg
         layers = []
         ldim = 0
-        self.dummy_param = nn.Parameter(torch.empty(0))
+        self.device = device
         for x in cfg:
             if x == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
@@ -203,7 +203,7 @@ class nn_fp(nn.Module):
         self.optimizer = optim.SGD(self.parameters(), lr=lr, momentum=momentum)
 
     def forward(self, x):
-        return self.layers(x)
+        return self.layers(x.to(self.device))
     
     def epoch(self, data_loader, epoch, log_interval, criterion, train=True):
         if train:
@@ -259,12 +259,12 @@ def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
     ws[0] = scale[0]
     return int8_clip(wt, 2**bitwidth - 1)
 
-def build_fp_model(in_channel, img_dim, out_dim, model_id, lr, momentum=0, use_bn=False):
+def build_fp_model(in_channel, img_dim, out_dim, model_id, lr, device, momentum=0, use_bn=False):
     cfg = model_dict[model_id]
-    model = model = nn_fp(in_channel, img_dim, out_dim, cfg, lr, momentum, use_bn)
+    model = model = nn_fp(in_channel, img_dim, out_dim, cfg, device, lr, momentum, use_bn)
     return model
 
-def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, Ab=8, Eb=8, stochastic=True,loss='CE'):
+def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, device, Ab=8, Eb=8, stochastic=True,loss='CE'):
     cfg = model_dict[model_id]
     w_quant = lambda x: fp_quant(x, Wb - 1)
     if stochastic:
@@ -283,11 +283,11 @@ def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, Ab
     a_rescale = lambda a, s: a_quant(a*s[0])
     e_rescale = lambda a, s: e_quant(a*s[0])
     model = nn_q(in_channel, img_dim, out_dim, cfg, loss, weight_update, a_rescale, e_rescale, 
-                a_quant, w_quant, 'uniform', use_bias=False)
+                a_quant, w_quant, 'uniform', device, use_bias=False)
     return model
     
 
-def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, Ab=8, Eb=8, m=5, loss='CE'):
+def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, device, Ab=8, Eb=8, m=5, loss='CE'):
     cfg = model_dict[model_id]
     w_quant = lambda x: fp_quant(x, Wb - 1)
     a_quant = lambda x: fp_quant(x, Ab - 1)
@@ -302,22 +302,22 @@ def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, Ab=8, Eb=8, m=5
     e_shift = lambda a, s : shift(a, s, Eb - 1)
     model = nn_q(
         in_channel, img_dim, out_dim, cfg, loss, weight_update, a_shit, e_shift, 
-                a_quant, w_quant, 'uniform',  use_bias=False)
+                a_quant, w_quant, 'uniform',  device, use_bias=False)
     return model
 
 def build_model(in_channel, img_dim, out_dim, args):
     if args.qmode == 2:
-        model = build_fp_model(in_channel, img_dim, out_dim, args.model, args.lr, momentum=args.momentum, use_bn=False)
+        model = build_fp_model(in_channel, img_dim, out_dim, args.model, args.lr, args.device, momentum=args.momentum, use_bn=False)
     else:
         loss = 'CE'
         if args.dataset == 'spectrum' or args.dataset == 'CWRU':
             loss = 'MSE'
         if args.qmode == 0: # NITI
             model = build_NITI_model(in_channel, img_dim, out_dim, args.model, 
-                                     args.Wbitwidth, Ab=args.Abitwidth, Eb=args.Ebitwidth, m=args.m, loss=loss)
+                                     args.Wbitwidth, args.device,  Ab=args.Abitwidth, Eb=args.Ebitwidth, m=args.m, loss=loss)
         elif args.qmode == 1:
             model = build_q_model(in_channel, img_dim, out_dim, args.model, 
-                                  args.Wbitwidth, args.batch_size, args.lr, Ab=args.Abitwidth, 
+                                  args.Wbitwidth, args.batch_size, args.lr, args.device, Ab=args.Abitwidth, 
                                   Eb=args.Ebitwidth, stochastic=args.stochastic, loss=loss)
     return model.to(args.device)
 
