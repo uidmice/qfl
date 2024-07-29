@@ -26,6 +26,7 @@ class Qnet(nn.Module):
         super(Qnet, self).__init__()
         self.loss = loss
         self.quantizer = quantizer
+        self.dummy_param = nn.Parameter(torch.empty(0))
 
     def forward(self, x):
         x_data, scale = self.quantizer(x)
@@ -164,6 +165,7 @@ class nn_fp(nn.Module):
         self.cfg = cfg
         layers = []
         ldim = 0
+        self.dummy_param = nn.Parameter(torch.empty(0))
         for x in cfg:
             if x == 'M':
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]

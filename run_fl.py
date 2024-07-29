@@ -23,10 +23,10 @@ parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
 
 parser.add_argument('--fl', default='fedavg', type=str)
-parser.add_argument('--niid', action='store_true', default=False)
+parser.add_argument('--niid', action='store_true', default=True)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
 
-parser.add_argument('--save', metavar='SAVE', default='fedavg_iid/mnist_t',
+parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
                     help='saved folder')
 parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='how many batches to wait before logging training status')
@@ -55,7 +55,7 @@ parser.add_argument('--device', type=str, default='cuda', metavar='D',)
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-args.device = torch.device('cpu')
+args.device = device
 
 def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None,  num_sample=None):
     updates = [] # dequantized 
@@ -72,6 +72,8 @@ def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None, 
                         dataset_cfg[args.dataset]['output_size'], 
                         args)
         model.load_state_dict(torch.load(c.model_path))
+        print(model.dummy_param.device)
+
         
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample)
 
@@ -106,7 +108,8 @@ def exp(root, config, seed):
     b0 = 4
     global_model = build_fp_model(dataset_cfg[args.dataset]['input_channel'], 
                         dataset_cfg[args.dataset]['input_size'], 
-                        dataset_cfg[args.dataset]['output_size'], args.model, args.lr)
+                        dataset_cfg[args.dataset]['output_size'], args.model, args.lr).to(device)
+    print(global_model.dummy_param.device)
     if args.init:
         logging.info("Init weights from: %s", args.init)
         global_model.load_state_dict(torch.load(args.init))
