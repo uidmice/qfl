@@ -110,46 +110,56 @@ def iid_samples(dataset, num_users):
         ds.append(Subset(dataset, indices))
     return ds
 
-def get_fl_dataset_iid(args, num_data_per_client, num_clients):
+def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
+    labels = dataset.dataset.targets[dataset.indices].numpy()
+    
+    # Create a list of indices for each class
+    indices_per_class = [[] for _ in range(num_classes)]
+    for idx, label in enumerate(labels):
+        indices_per_class[label].append(idx)
+    
+    # Create Dirichlet distribution for the non-IID partitioning
+    dirichlet_dist = np.random.dirichlet([alpha] * num_clients, num_classes)
+    
+    client_indices = [[] for _ in range(num_clients)]
+    for cls, proportions in zip(indices_per_class, dirichlet_dist):
+        cls_indices = np.array(cls)
+        np.random.shuffle(cls_indices)
+        
+        # Split the class indices according to the proportions
+        split_indices = np.split(cls_indices, (np.cumsum(proportions)[:-1] * len(cls)).astype(int))
+        for client_idx, indices in enumerate(split_indices):
+            client_indices[client_idx].extend(indices)
+    return  [Subset(dataset, indices) for indices in client_indices]
+    
+def get_fl_dataset(args, num_data_per_client, num_clients):
     if 'mnist' in args.dataset:
-        cfg = dataset_cfg[args.dataset]
-        transform = transforms.Compose([
-            transforms.Resize(cfg['input_size']),
-            transforms.ToTensor(),
-        ])
-        norm = dataset_stats['mnist']
-        train_ds = datasets.MNIST('data/mnist', train=True, download=True, 
-                                     transform=scale_crop(input_size=28,
-                                                        scale_size=cfg['input_size'], normalize=norm))
-        test_ds = datasets.MNIST('data/mnist', train=False, download=True, 
+        train_ds_clients, test_ds_clients, test_ds  = get_mnist_data(args, num_data_per_client, num_clients)
+    return train_ds_clients, test_ds_clients, test_ds 
+
+def get_mnist_data(args, num_data_per_client, num_clients):
+    cfg = dataset_cfg[args.dataset]
+    transform = transforms.Compose([
+        transforms.Resize(cfg['input_size']),
+        transforms.ToTensor(),
+    ])
+    norm = dataset_stats['mnist']
+    train_ds = datasets.MNIST('data/mnist', train=True, download=True, 
                                     transform=scale_crop(input_size=28,
-                                                        scale_size=cfg['input_size'], normalize=norm))
+                                                    scale_size=cfg['input_size'], normalize=norm))
+    test_ds = datasets.MNIST('data/mnist', train=False, download=True, 
+                                transform=scale_crop(input_size=28,
+                                                    scale_size=cfg['input_size'], normalize=norm))
     number_data = num_data_per_client * num_clients
     train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
     test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(number_data*2, len(test_ds)), replace=False))
-    train_ds_clients = iid_samples(train_ds, num_clients)
-    test_ds_clients = iid_samples(test_ds, num_clients)
-    return train_ds_clients, test_ds_clients, test_ds 
-def get_fl_dataset_niid(args, num_data_per_client, num_clients):
-    if 'mnist' in args.dataset:
-        cfg = dataset_cfg[args.dataset]
-        transform = transforms.Compose([
-            transforms.Resize(cfg['input_size']),
-            transforms.ToTensor(),
-        ])
-        norm = dataset_stats['mnist']
-        train_ds = datasets.MNIST('data/mnist', train=True, download=True, 
-                                     transform=scale_crop(input_size=28,
-                                                        scale_size=cfg['input_size'], normalize=norm))
-        test_ds = datasets.MNIST('data/mnist', train=False, download=True, 
-                                    transform=scale_crop(input_size=28,
-                                                        scale_size=cfg['input_size'], normalize=norm))
-    number_data = num_data_per_client * num_clients
-    train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
-    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(number_data*2, len(test_ds)), replace=False))
-    train_ds_clients = iid_samples(train_ds, num_clients)
-    test_ds_clients = iid_samples(test_ds, num_clients)
-    return train_ds_clients, test_ds_clients, test_ds 
+    if args.niid:
+        train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
+        test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
+    else:
+        train_ds_clients = iid_samples(train_ds, num_clients)
+        test_ds_clients = iid_samples(test_ds, num_clients)
+    return train_ds_clients, test_ds_clients, test_ds
 
 class Dataset_Custom(Dataset):
     def __init__(self, data, hist_len):

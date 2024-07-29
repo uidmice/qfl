@@ -23,10 +23,10 @@ parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
 
 parser.add_argument('--fl', default='fedavg', type=str)
-parser.add_argument('--niid', action='store_true', default=False)
+parser.add_argument('--niid', action='store_true', default=True)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
 
-parser.add_argument('--save', metavar='SAVE', default='fedavg_iid/mnist_t',
+parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
                     help='saved folder')
 parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='how many batches to wait before logging training status')
@@ -36,7 +36,7 @@ parser.add_argument('--seeds', type=int, default=[0,1,2,3,4], nargs='+',
                     help='random seed (default: None)')
 
 parser.add_argument('--model', default=4, type=int)
-parser.add_argument('--qmode', default=0, type=int, help='0: NITI, 1: use int+fp calculation, 2: fp')
+parser.add_argument('--qmode', default=1, type=int, help='0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--dataset', type=str, default='mnist',
                     help='dataset dir')
 parser.add_argument('--initialization', default='uniform', choices=['uniform', 'normal'], type=str)
@@ -50,10 +50,12 @@ parser.add_argument('--use_bn', action='store_true', default=False)
 
 parser.add_argument('--lr', type=float, default=0.02, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
+parser.add_argument('--device', type=str, default='cuda', metavar='D',)
 
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+args.device = device
 
 def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None,  num_sample=None):
     updates = [] # dequantized 
@@ -96,10 +98,8 @@ def exp(root, config, seed):
     
     set_seed(seed)
 
-    if args.niid:
-        train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset_niid(args, args.local_data, args.num_clients)
-    else:
-        train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset_iid(args, args.local_data, args.num_clients)
+    
+    train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, args.local_data, args.num_clients)
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False)
     
     
