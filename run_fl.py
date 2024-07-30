@@ -54,7 +54,7 @@ parser.add_argument('--device', type=str, default='cuda', metavar='D',)
 
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device(args.device)
 args.device = device
 
 args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
