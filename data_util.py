@@ -4,6 +4,9 @@ from torchvision import datasets
 from torch.utils.data import Dataset, DataLoader, Subset
 import numpy as np
 import csv
+import json
+import os
+from collections import defaultdict
 
 CWRU_hist = 32
 dataset_stats = {
@@ -132,7 +135,7 @@ def get_fl_dataset(args, num_data_per_client, num_clients):
     if 'mnist' == args.dataset:
         train_ds_clients, test_ds_clients, test_ds  = get_mnist_data(args, num_data_per_client, num_clients)
     elif 'femnist' == args.dataset:
-        train_ds_clients, test_ds_clients, test_ds  = get_femnist_data(args, num_data_per_client, num_clients)
+        train_ds_clients, test_ds_clients, test_ds  = get_femnist_data(args)
     return train_ds_clients, test_ds_clients, test_ds 
 
 def get_mnist_data(args, num_data_per_client, num_clients):
@@ -159,21 +162,50 @@ def get_mnist_data(args, num_data_per_client, num_clients):
         test_ds_clients = iid_samples(test_ds, num_clients)
     return train_ds_clients, test_ds_clients, test_ds
 
-def get_femnist_data(args, num_data_per_client, num_clients):
-    cfg = dataset_cfg[args.dataset]
-    norm = dataset_stats['mnist']
-    train_ds = datasets.EMNIST('data', train=True, download=True, split='byclass',
-                                    transform=scale_crop(input_size=28,
-                                                    scale_size=cfg['input_size'], normalize=norm))
-    test_ds = datasets.EMNIST('data', train=False, download=True, split='letters',
-                                transform=scale_crop(input_size=28,
-                                                    scale_size=cfg['input_size'], normalize=norm))
-    number_data = num_data_per_client * num_clients
-    train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
-    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(number_data*2, len(test_ds)), replace=False))
-    train_ds_clients = iid_samples(train_ds, num_clients)
-    test_ds_clients = iid_samples(test_ds, num_clients)
-    return train_ds_clients, test_ds_clients, test_ds
+def read_dir(data_dir):
+    clients = []
+    data = defaultdict(lambda : None)
+
+    files = os.listdir(data_dir)
+    files = [f for f in files if f.endswith('.json')]
+    for f in files:
+        file_path = os.path.join(data_dir,f)
+        with open(file_path, 'r') as inf:
+            cdata = json.load(inf)
+        clients.extend(cdata['users'])
+        data.update(cdata['user_data'])
+
+    clients = list(sorted(data.keys()))
+    return clients, data
+
+
+def read_data(train_data_dir, test_data_dir):
+    train_clients, train_data = read_dir(train_data_dir)
+    test_clients, test_data = read_dir(test_data_dir)
+
+    assert train_clients == test_clients
+    return train_clients, train_data, test_data
+
+
+def get_femnist_data(args):
+    if args.niid:
+        train_clients, train_data, test_data = read_data('data/femnist_iid_36/train', 'data/femnist_iid_36/test') 
+    else:
+        train_clients, train_data, test_data = read_data('data/femnist_iid_36/train', 'data/femnist_iid_36/test') 
+
+    train_ds_clients = []
+    test_ds_clients = []
+    ttx = []
+    tty = []
+
+    for c in train_clients:
+        train_ds_clients.append(DatasetFEMNIST(train_data[c]['x'], train_data[c]['y']))
+        tx = test_data[c]['x']
+        ty = test_data[c]['y']
+        test_ds_clients.append(DatasetFEMNIST(tx, ty))
+        ttx.extend(tx)
+        tty.extend(ty)
+    return train_ds_clients, test_ds_clients, DatasetFEMNIST(ttx, tty)
 
 class Dataset_Custom(Dataset):
     def __init__(self, data, hist_len):
@@ -189,3 +221,17 @@ class Dataset_Custom(Dataset):
     def __len__(self):
         return len(self.data)//self.hist_len
 
+class DatasetFEMNIST(Dataset):
+    def __init__(self, data, label):
+        # init
+        self.data = torch.stack([torch.tensor(d) for d in data]).reshape(-1,28, 28)
+        self.label = torch.tensor(label)
+        mean = self.data.mean()
+        std = self.data.std()
+        self.data = (self.data - mean) / std
+
+    def __getitem__(self, index):
+        return self.data[index].unsqueeze(0), int(self.label[index])
+    
+    def __len__(self):
+        return len(self.data)

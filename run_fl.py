@@ -59,10 +59,11 @@ args.device = device
 
 args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
 
-def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None,  num_sample=None):
+def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_selection=None,  num_sample=None):
     updates = [] # dequantized 
     loss = []
     acc = []
+    p = []
     for i, c in enumerate(clients):
         if args.qmode != 2  :
             args.Wbitwidth = bitwidth_selection[i]
@@ -77,6 +78,9 @@ def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None, 
 
         
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample)
+        p.append(len(c.train_data))
+        if adaptive:
+            p[-1] = p[-1] * [1 - 2.0**(2-bitwidth_selection[i])]
 
         if not isinstance(model, nn_fp):
             model = model.dequantize()
@@ -84,7 +88,7 @@ def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None, 
         updates.append(model.state_dict())
         loss.append(li)
         acc.append(ai)
-    return updates, loss, acc
+    return updates, np.array(p)/np.sum(p), loss, acc
 
 def average_models(models, weights):
     state_dict = {}
@@ -110,6 +114,7 @@ def exp(root, config, seed):
     global_model = build_fp_model(dataset_cfg[args.dataset]['input_channel'], 
                         dataset_cfg[args.dataset]['input_size'], 
                         dataset_cfg[args.dataset]['output_size'], args.model, args.lr, args.device).to(device)
+    args.num_clients = len(train_ds_clients)
     if args.init:
         logging.info("Init weights from: %s", args.init)
         global_model.load_state_dict(torch.load(args.init))
@@ -138,19 +143,15 @@ def exp(root, config, seed):
 
         if args.qmode == 2:
             bitwidth_selecton = None
-            weights = [1/len(server.selected_clients)]*len(server.selected_clients)
 
         elif args.adaptive_bitwidth:
             bm = np.floor(b0 * (4.1 ** (1-val_loss/f0)))
             print(f"bm: {bm}")
             bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in server.selected_clients]
-            weights = [1 - 2.0**(2-b) for b in bitwidth_selecton]
-            weights = np.array(weights)/np.sum(weights)
         else:
             bitwidth_selecton = [c.bitwidth_limit for c in server.selected_clients]
-            weights = [1/len(server.selected_clients)]*len(server.selected_clients)
         selected_clients = server.update_client_model(server.selected_clients)
-        updates, loss, acc = client_train(server.selected_clients, args.local_ep, args.batch_size, 
+        updates, weights, loss, acc = client_train(server.selected_clients, args.local_ep, args.batch_size, adaptive=args.adaptive_bitwidth,
                                           bitwidth_selection=bitwidth_selecton)
 
         averged_update = average_models(updates, weights)
