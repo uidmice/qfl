@@ -51,6 +51,7 @@ parser.add_argument('--use_bn', action='store_true', default=False)
 parser.add_argument('--lr', type=float, default=0.02, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
 parser.add_argument('--device', type=str, default='cuda', metavar='D',)
+parser.add_argument('--num_workers', type=int, default=4, metavar='N',)
 
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
@@ -77,12 +78,13 @@ def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_
         model.load_state_dict(torch.load(c.model_path))
 
         
-        li, ai, model = c.train(model, num_epochs, batch_size, num_sample)
+        li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
         if adaptive:
             p[-1] = p[-1] * [1 - 2.0**(2-bitwidth_selection[i])]
 
         if not isinstance(model, nn_fp):
+            
             model = model.dequantize()
 
         updates.append(model.state_dict())
@@ -107,7 +109,7 @@ def exp(root, config, seed):
 
     
     train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, args.local_data, args.num_clients)
-    test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=10)
+    test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=args.num_workers)
     
     
     b0 = 4
