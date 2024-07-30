@@ -22,7 +22,7 @@ class Client:
         train_loader = DataLoader(self.train_data, batch_size=batch_size, sampler=random_sample, num_workers=num_workers)
         self.train_epoch += num_epochs
         for i in range(num_epochs):
-            loss, acc = model.epoch(train_loader, i,  2, self.criterion, train=True)
+            loss, acc = model.epoch(train_loader, i,  7, self.criterion, train=True)
         return loss, acc, model
 
     def test(self, model, set_to_use='test'):

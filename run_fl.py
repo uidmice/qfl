@@ -9,7 +9,7 @@ from fl_client import *
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--total_steps', type=int, default=100,
+parser.add_argument('--total_steps', type=int, default=70,
                     help="number of rounds of training")
 parser.add_argument('--num_clients', type=int, default=10, nargs='+',
                     help="number of users: K")
@@ -32,7 +32,7 @@ parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--init',
                     help='init ckpt')
-parser.add_argument('--seeds', type=int, default=[0,1,2,3,4], nargs='+',
+parser.add_argument('--seeds', type=int, default=[0], nargs='+',
                     help='random seed (default: None)')
 
 parser.add_argument('--model', default=4, type=int)
@@ -48,10 +48,10 @@ parser.add_argument('--Ebitwidth', default=8, type=int)
 parser.add_argument('--stochastic', action='store_true', default=True)
 parser.add_argument('--use_bn', action='store_true', default=False)
 
-parser.add_argument('--lr', type=float, default=0.02, metavar='LR')
+parser.add_argument('--lr', type=float, default=0.05, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
 parser.add_argument('--device', type=str, default='cpu', metavar='D',)
-parser.add_argument('--num_workers', type=int, default=4, metavar='N',)
+parser.add_argument('--num_workers', type=int, default=0, metavar='N',)
 
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
@@ -142,13 +142,11 @@ def exp(root, config, seed):
     average_model_size = None
     val_loss, _ = global_model.epoch(test_loader, 0, args.log_interval, criterion, train=False)
     f0 = val_loss
-    C = f0/(2.0**16)
+    C = f0/(2.0**16) - 0.
     for steps in range(0, args.total_steps):
         print(f"Step {steps}")
 
-        number_of_clients = len(clients)
-        if number_of_clients > 100:
-            number_of_clients = int(np.floor(number_of_clients * 0.2))
+        number_of_clients = int(np.floor(args.num_clients * 0.2))
 
         server.select_clients_random(steps, clients, number_of_clients)
 
@@ -156,7 +154,7 @@ def exp(root, config, seed):
             bitwidth_selecton = None
 
         elif args.adaptive_bitwidth:
-            bm = int(np.floor(b0 + 0.1 + np.floor(np.log2((f0+C)/(val_loss+C)))))
+            bm = b0 + int(np.floor(7 * np.log2(2.0 - val_loss/f0) + 7 * np.log2((2 * steps + 1)/(f0 - val_loss + steps + 1))))
             print(f"bm: {bm}")
             bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in server.selected_clients]
         else:
