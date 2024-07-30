@@ -110,7 +110,7 @@ def iid_samples(dataset, num_users):
     return ds
 
 def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
-    labels = dataset.targets.numpy()
+    labels = dataset.dataset.targets[dataset.indices].numpy()
     
     # Create a list of indices for each class
     indices_per_class = [[] for _ in range(num_classes)]
