@@ -24,7 +24,7 @@ parser.add_argument('--log_interval', type=int, default=5, metavar='N',
 
 parser.add_argument('--fl', default='fedavg', type=str)
 parser.add_argument('--niid', action='store_true', default=False)
-parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
+parser.add_argument('--adaptive_bitwidth', action='store_true', default=True)
 
 parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
                     help='saved folder')
@@ -84,13 +84,9 @@ def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_
         
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
-        if adaptive:
-            p[-1] = p[-1] * (1 - 2.0**(2-bitwidth_selection[i]))
 
         if not isinstance(model, nn_fp):
-
             model = model.dequantize()
-
         updates.append(model.state_dict())
         loss.append(li)
         acc.append(ai)
@@ -114,7 +110,6 @@ def exp(root, config, seed):
     
     train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, args.local_data, args.num_clients)
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=args.num_workers)
-    
     
     
     global_model = build_fp_model(dataset_cfg[args.dataset]['input_channel'], 
@@ -156,7 +151,9 @@ def exp(root, config, seed):
         elif args.adaptive_bitwidth:
             bm = b0 + int(np.floor(7 * np.log2(2.0 - val_loss/f0) + 7 * np.log2((2 * steps + 1)/(f0 - val_loss + steps + 1))))
             print(f"bm: {bm}")
-            bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in server.selected_clients]
+            bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in clients]
+            p = [(1 - 2.0**(2-bn)) for bn in bitwidth_selecton]
+            server.select_clients_random(steps, clients, number_of_clients, prob=np.array(p)/np.sum(p))
         else:
             bitwidth_selecton = [c.bitwidth_limit for c in server.selected_clients]
         selected_clients = server.update_client_model(server.selected_clients)

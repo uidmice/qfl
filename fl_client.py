@@ -41,10 +41,10 @@ class Server:
         self.selected_clients = []
         self.updates = []
 
-    def select_clients_random(self, my_round, possible_clients, num_clients=5):
+    def select_clients_random(self, my_round, possible_clients, num_clients=5, prob=None):
         num_clients = min(num_clients, len(possible_clients))
         np.random.seed(my_round)
-        self.selected_clients = np.random.choice(possible_clients, num_clients, replace=False)
+        self.selected_clients = np.random.choice(possible_clients, num_clients, replace=False, p=prob)
         return [(len(c.train_data), len(c.eval_data)) for c in self.selected_clients]
     
     def update_client_model(self, clients):
