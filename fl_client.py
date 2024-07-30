@@ -19,7 +19,7 @@ class Client:
         if num_sample is None:
             num_sample = len(self.train_data)
         random_sample = RandomSampler(self.train_data, num_samples=num_sample)
-        train_loader = DataLoader(self.train_data, batch_size=batch_size, sampler=random_sample)
+        train_loader = DataLoader(self.train_data, batch_size=batch_size, sampler=random_sample, num_workers=10)
         self.train_epoch += num_epochs
         for i in range(num_epochs):
             loss, acc = model.epoch(train_loader, i,  -1, self.criterion, train=True)

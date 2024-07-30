@@ -107,7 +107,7 @@ def exp(root, config, seed):
 
     
     train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, args.local_data, args.num_clients)
-    test_loader = DataLoader(test_ds, batch_size=128, shuffle=False)
+    test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=10)
     
     
     b0 = 4
