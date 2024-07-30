@@ -189,7 +189,7 @@ def read_data(train_data_dir, test_data_dir):
 
 def get_femnist_data(args):
     if args.niid:
-        train_clients, train_data, test_data = read_data('data/femnist_niid_188/train', 'data/femnist_niid_188/test') 
+        train_clients, train_data, test_data = read_data('data/femnist_niid_140/train', 'data/femnist_niid_140/test') 
     else:
         train_clients, train_data, test_data = read_data('data/femnist_iid_36/train', 'data/femnist_iid_36/test') 
 
