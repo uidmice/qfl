@@ -29,7 +29,7 @@ class Qnet(nn.Module):
 
     def forward(self, x):
         x_data, scale = self.quantizer(x)
-        x = x_data.to(self.device), scale
+        x = x_data, scale
         self.out, self.out_s = self.forward_layers(x)
         return self.out, self.out_s
 
@@ -142,7 +142,7 @@ class nn_q(Qnet):
             start_time = time.time()
 
             if train:
-                self.backward(target.to(self.device))
+                self.backward(target)
                 if log_interval > 0 and batch_idx % log_interval == 0:
                     print('[{0}][{1:>3}/{2}] '
                         'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) '
@@ -203,7 +203,7 @@ class nn_fp(nn.Module):
         self.optimizer = optim.SGD(self.parameters(), lr=lr, momentum=momentum)
 
     def forward(self, x):
-        return self.layers(x.to(self.device))
+        return self.layers(x)
     
     def epoch(self, data_loader, epoch, log_interval, criterion, train=True):
         if train:
@@ -216,7 +216,7 @@ class nn_fp(nn.Module):
         for batch_idx, (inputs, target) in enumerate(data_loader):
             self.optimizer.zero_grad()
             output = self.forward(inputs)
-            loss = criterion(output, target.to(self.device))
+            loss = criterion(output, target)
             loss_meter.update(float(loss.item()), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
                 acc = accuracy(output.cpu(), target)
@@ -319,7 +319,7 @@ def build_model(in_channel, img_dim, out_dim, args):
             model = build_q_model(in_channel, img_dim, out_dim, args.model, 
                                   args.Wbitwidth, args.batch_size, args.lr, args.device, Ab=args.Abitwidth, 
                                   Eb=args.Ebitwidth, stochastic=args.stochastic, loss=loss)
-    return model.to(args.device)
+    return model
 
 # def build_model(in_channel, img_dim, out_dim, args):
 #     cfg = model_dict[args.model]

@@ -40,7 +40,7 @@ parser.add_argument('--qmode', default=1, type=int, help='0: NITI, 1: use int+fp
 parser.add_argument('--dataset', type=str, default='mnist',
                     help='dataset dir')
 parser.add_argument('--initialization', default='uniform', choices=['uniform', 'normal'], type=str)
-parser.add_argument('--m', default=3, type=int)
+parser.add_argument('--m', default=5, type=int)
 
 parser.add_argument('--Wbitwidth', default=4, type=int)
 parser.add_argument('--Abitwidth', default=8, type=int)
@@ -50,13 +50,17 @@ parser.add_argument('--use_bn', action='store_true', default=False)
 
 parser.add_argument('--lr', type=float, default=0.02, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
-parser.add_argument('--device', type=str, default='cuda', metavar='D',)
+parser.add_argument('--device', type=str, default='cpu', metavar='D',)
 parser.add_argument('--num_workers', type=int, default=4, metavar='N',)
 
 args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
+if args.device == 'cuda' and not torch.cuda.is_available():
+    args.device = 'cpu'
+    logging.info("Cuda is not available, using CPU")
 device = torch.device(args.device)
 args.device = device
+b0 = 4
 
 args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
 
@@ -81,10 +85,10 @@ def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
         if adaptive:
-            p[-1] = p[-1] * [1 - 2.0**(2-bitwidth_selection[i])]
+            p[-1] = p[-1] * (1 - 2.0**(2-bitwidth_selection[i]))
 
         if not isinstance(model, nn_fp):
-            
+
             model = model.dequantize()
 
         updates.append(model.state_dict())
@@ -104,7 +108,7 @@ def average_models(models, weights):
     
 def exp(root, config, seed):
     writer, save_path = set_save_path(root,  config, seed, args)
-    
+
     set_seed(seed)
 
     
@@ -112,10 +116,10 @@ def exp(root, config, seed):
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=args.num_workers)
     
     
-    b0 = 4
+    
     global_model = build_fp_model(dataset_cfg[args.dataset]['input_channel'], 
                         dataset_cfg[args.dataset]['input_size'], 
-                        dataset_cfg[args.dataset]['output_size'], args.model, args.lr, args.device).to(device)
+                        dataset_cfg[args.dataset]['output_size'], args.model, args.lr, args.device)
     args.num_clients = len(train_ds_clients)
     if args.init:
         logging.info("Init weights from: %s", args.init)
@@ -138,6 +142,7 @@ def exp(root, config, seed):
     average_model_size = None
     val_loss, _ = global_model.epoch(test_loader, 0, args.log_interval, criterion, train=False)
     f0 = val_loss
+    C = f0/(2.0**16)
     for steps in range(0, args.total_steps):
         print(f"Step {steps}")
 
@@ -151,7 +156,7 @@ def exp(root, config, seed):
             bitwidth_selecton = None
 
         elif args.adaptive_bitwidth:
-            bm = np.floor(b0 * (4.1 ** (1-val_loss/f0)))
+            bm = int(np.floor(b0 + 0.1 + np.floor(np.log2((f0+C)/(val_loss+C)))))
             print(f"bm: {bm}")
             bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in server.selected_clients]
         else:
