@@ -191,6 +191,10 @@ def exp(root, config, seed):
         tacc.append(acc)
         vloss.append(val_loss)
         vacc.append(val_prec1)
+    
+    if average_epoch is None:
+        average_epoch = [c.train_epoch for c in clients]
+        average_model_size = [np.mean(c.train_bitwidth_hist) for c in clients]
 
     return tloss, tacc, vloss, vacc, average_epoch, average_model_size
 
