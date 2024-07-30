@@ -23,7 +23,7 @@ parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
 
 parser.add_argument('--fl', default='fedavg', type=str)
-parser.add_argument('--niid', action='store_true', default=True)
+parser.add_argument('--niid', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
 
 parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
@@ -56,6 +56,8 @@ args = parser.parse_args()
 logging.basicConfig(level=logging.DEBUG)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 args.device = device
+
+args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
 
 def client_train(clients, num_epochs=1, batch_size=32, bitwidth_selection=None,  num_sample=None):
     updates = [] # dequantized 

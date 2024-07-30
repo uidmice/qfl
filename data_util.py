@@ -14,12 +14,8 @@ dataset_stats = {
 
 dataset_cfg = {
     'mnist': {'input_size': 28, 'output_size': 10, 'input_channel': 1},    
-    'mnist_b': {'input_size': 28, 'output_size': 2, 'input_channel': 1},
-    'mnist0': {'input_size': 14, 'output_size': 10, 'input_channel': 1},    
-    'mnist0_b': {'input_size': 14, 'output_size': 2, 'input_channel': 1},
+    'femnist': {'input_size': 28, 'output_size': 62, 'input_channel': 1},    
     'cifar10': {'input_size': 32, 'output_size': 10, 'input_channel': 3},
-    'spectrum': {'input_size': 0, 'output_size': 64, 'input_channel': 64},
-    'CWRU': {'input_size': 0, 'output_size': CWRU_hist, 'input_channel': CWRU_hist}
 }
 
 def scale_crop(input_size, scale_size, normalize):
@@ -43,7 +39,7 @@ def pad_random_crop(input_size, scale_size, normalize):
     ])
 
 def get_dataset(args):
-    if 'mnist' in args.dataset:
+    if 'mnist' ==  args.dataset:
         cfg = dataset_cfg[args.dataset]
         transform = transforms.Compose([
             transforms.Resize(cfg['input_size']),
@@ -111,7 +107,7 @@ def iid_samples(dataset, num_users):
     return ds
 
 def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
-    labels = dataset.dataset.targets[dataset.indices].numpy()
+    labels = dataset.targets.numpy()
     
     # Create a list of indices for each class
     indices_per_class = [[] for _ in range(num_classes)]
@@ -133,8 +129,10 @@ def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
     return  [Subset(dataset, indices) for indices in client_indices]
     
 def get_fl_dataset(args, num_data_per_client, num_clients):
-    if 'mnist' in args.dataset:
+    if 'mnist' == args.dataset:
         train_ds_clients, test_ds_clients, test_ds  = get_mnist_data(args, num_data_per_client, num_clients)
+    elif 'femnist' == args.dataset:
+        train_ds_clients, test_ds_clients, test_ds  = get_femnist_data(args, num_data_per_client, num_clients)
     return train_ds_clients, test_ds_clients, test_ds 
 
 def get_mnist_data(args, num_data_per_client, num_clients):
@@ -161,6 +159,22 @@ def get_mnist_data(args, num_data_per_client, num_clients):
         test_ds_clients = iid_samples(test_ds, num_clients)
     return train_ds_clients, test_ds_clients, test_ds
 
+def get_femnist_data(args, num_data_per_client, num_clients):
+    cfg = dataset_cfg[args.dataset]
+    norm = dataset_stats['mnist']
+    train_ds = datasets.EMNIST('data', train=True, download=True, split='byclass',
+                                    transform=scale_crop(input_size=28,
+                                                    scale_size=cfg['input_size'], normalize=norm))
+    test_ds = datasets.EMNIST('data', train=False, download=True, split='letters',
+                                transform=scale_crop(input_size=28,
+                                                    scale_size=cfg['input_size'], normalize=norm))
+    number_data = num_data_per_client * num_clients
+    train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
+    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(number_data*2, len(test_ds)), replace=False))
+    train_ds_clients = iid_samples(train_ds, num_clients)
+    test_ds_clients = iid_samples(test_ds, num_clients)
+    return train_ds_clients, test_ds_clients, test_ds
+
 class Dataset_Custom(Dataset):
     def __init__(self, data, hist_len):
         # init
@@ -175,89 +189,3 @@ class Dataset_Custom(Dataset):
     def __len__(self):
         return len(self.data)//self.hist_len
 
-
-
-    
-# def prepare_mnist_data(dim, iid=0, num_dev = 5, num_ds = 300):
-
-#     transform = transforms.Compose([
-#         transforms.Resize((dim, dim)),  # Resize the image to 14x14
-#         transforms.ToTensor(),
-#         transforms.Lambda(lambda x: x.view(-1))
-#     ])
-#     mnist_train = datasets.MNIST('data/mnist', train=True, download=True, transform=transform)
-#     mnist_test = datasets.MNIST('data/mnist', train=False, download=True, transform=transform)
-
-#     mnist_even_odd_test= [(x,label % 2, label) for (x,label) in mnist_test]
-#     mnist_even_odd_train= [(x,label % 2, label) for (x,label) in mnist_train]
-
-#     if iid:
-#         return mnist_even_odd_test, mnist_even_odd_train, *iid_samples(mnist_train, num_dev, num_ds)
-#     return mnist_even_odd_test, mnist_even_odd_train, *mnist_non_iid_samples(mnist_train, num_dev, num_ds)
-
-# def samples(dataset, num_users):
-#     total_indices = np.arange(len(dataset))
-#     np.random.shuffle(total_indices)
-
-#     ds = []
-#     num_data = len(dataset) // num_users
-#     for i in range(num_users):
-#         indices = total_indices[i*num_data:(i+1)*num_data]
-#         original = [dataset[i] for i in indices]
-#         ds.append([(x,label) for (x,label) in original])
-#     return ds
-
-# def prepare_thermal_data(num_dev = 5, num_ds = 300):
-
-#     train_dataset = torch.load('data/thermal/train_dataset_scaled.pt')
-#     test_dataset = torch.load('data/thermal/test_dataset_scaled.pt')
-
-#     return test_dataset, train_dataset, samples(train_dataset, num_dev)
-
-# def gen_loaders(path, BATCH_SIZE, NUM_WORKERS):
-#     # Data loading code
-#     train_dataset = datasets.CIFAR10(root=path,
-#                                     train=True,
-#                                     transform=pad_random_crop(input_size=32,
-#                                                             scale_size=40),
-#                                     download=True)
-
-#     val_dataset = datasets.CIFAR10(root=path,
-#                                     train=False,
-#                                     transform=scale_crop(input_size=32,
-#                                                         scale_size=32),
-#                                     download=True)
-
-#     train_loader = torch.utils.data.DataLoader(train_dataset,
-#                                             batch_size=BATCH_SIZE,
-#                                             shuffle=True,
-#                                             num_workers=NUM_WORKERS,
-#                                             pin_memory=True)
-
-#     val_loader = torch.utils.data.DataLoader(val_dataset,
-#                                             batch_size=BATCH_SIZE,
-#                                             shuffle=False,
-#                                             num_workers=NUM_WORKERS,
-#                                             pin_memory=True)
-
-#     return (train_loader, val_loader)
-
-# def scale_crop(input_size, scale_size, normalize):
-#     t_list = [
-#         transforms.CenterCrop(input_size),
-#         transforms.ToTensor(),
-#         # transforms.Normalize(**normalize),
-#     ]
-#     if scale_size != input_size:
-#         t_list = [transforms.Resize(scale_size)] + t_list
-
-#     return transforms.Compose(t_list)
-
-# def pad_random_crop(input_size, scale_size, normalize):
-#     padding = int((scale_size - input_size) / 2)
-#     return transforms.Compose([
-#         transforms.RandomCrop(input_size, padding=padding),
-#         transforms.RandomHorizontalFlip(),
-#         transforms.ToTensor(),
-#         transforms.Normalize(**normalize),
-#     ])
