@@ -136,7 +136,7 @@ def get_fl_dataset(args, num_data_per_client, num_clients):
         train_ds_clients, test_ds_clients, test_ds  = get_mnist_data(args, num_data_per_client, num_clients)
     elif 'femnist' == args.dataset:
         train_ds_clients, test_ds_clients, test_ds  = get_femnist_data(args)
-    elif 'cifar10' in args.dataset:
+    elif 'cifar10' == args.dataset:
         train_ds_clients, test_ds_clients, test_ds  = get_cifar10_data(args, num_data_per_client, num_clients)
     return train_ds_clients, test_ds_clients, test_ds 
 
