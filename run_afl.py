@@ -170,7 +170,8 @@ def exp(root, config, seed):
 
         updates, weights, loss, acc = client_train(server.selected_clients, args.local_ep, args.batch_size, adaptive=args.adaptive_bitwidth,
                                           bitwidth_selection=[bitwidth_selecton[c.id] for c in server.selected_clients])
-        ct = np.sum([bitwidth_selecton[c.id] for c in server.selected_clients])
+        ct = np.sum([c.train_bitwidth_hist[-1] for c in server.selected_clients])
+        print(ct)
         comp.append(ct)
         if len(comm) > 0:
             comm.append(ct + comm[-1])
