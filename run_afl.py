@@ -99,7 +99,7 @@ def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_
         updates.append(model.state_dict())
         loss.append(li)
         acc.append(ai)
-    return updates, np.array(p)/np.sum(p), loss, acc
+    return updates, p, loss, acc
 
 def average_models(models, weights):
     state_dict = {}
@@ -133,7 +133,7 @@ def exp(root, config, seed):
     
     server = Server(global_model)
     bitwidth_limits = np.random.randint(b0, 17, args.num_clients)
-    dropout_prob = np.random.uniform(0.6, 0.9, args.num_clients)
+    dropout_prob = np.random.uniform(0.7, 0.9, args.num_clients)
 
     with open(save_path+'/bitwidth_limit.txt', 'w') as f:
         f.write(str(bitwidth_limits) + '\n')
@@ -159,35 +159,43 @@ def exp(root, config, seed):
     val_loss, _ = global_model.epoch(test_loader, 0, args.log_interval, criterion, train=False)
     f0 = val_loss
     C = 16/(np.log2(f0+1))
+
+    buffer = []
+    weight = []
+    comm = []
+    comp = []
     for steps in range(0, args.total_steps):
         print(f"Step {steps}", len(server.selected_clients), [c.id for c in server.selected_clients])
         print(f"Bitwidth: {bitwidth_selecton}")
 
         updates, weights, loss, acc = client_train(server.selected_clients, args.local_ep, args.batch_size, adaptive=args.adaptive_bitwidth,
                                           bitwidth_selection=[bitwidth_selecton[c.id] for c in server.selected_clients])
+        ct = np.sum([bitwidth_selecton[c.id] for c in server.selected_clients])
+        comp.append(ct)
+        if len(comm) > 0:
+            comm.append(ct + comm[-1])
+        else:
+            comm.append(ct)
+        buffer.extend(updates)
+        weight.extend(weights)
+        if len(buffer) > 5:
+            averged_update = average_models(buffer, np.array(weight)/np.sum(weight))
+            buffer = []
+            weight = []
+            global_model.load_state_dict(averged_update)
+            print('update!')
 
-        averged_update = average_models(updates, weights)
-        global_model.load_state_dict(averged_update)
-        server.update_client_model(server.selected_clients)
+        val_loss, val_prec1= global_model.epoch(test_loader, steps, args.log_interval, criterion, train=False)
 
         if args.adaptive_bitwidth:
             bm = b0 + int(np.floor(C * np.log2(max(1.0, (f0+1)/(val_loss + 1)))))
             print(f"bm: {bm}")
             for c in server.selected_clients:
                 bitwidth_selecton[c.id] = min(bm, c.bitwidth_limit)
-        
+        server.update_client_model(server.selected_clients)
         server.selected_clients = drop_out(clients, dropout_prob)
-
-        val_loss, val_prec1= global_model.epoch(test_loader, steps, args.log_interval, criterion, train=False)
-
-        writer.add_scalar('Accuracy/train', np.average(acc), steps)
-        writer.add_scalar('Loss/train', np.average(loss), steps)
-
-        writer.add_scalar("Global/Loss/test", val_loss, steps)
-        writer.add_scalar("Global/Acc/test", val_prec1, steps)
         
         best_acc = max(val_prec1, best_acc)
-        writer.add_scalar('Accuracy/best', best_acc, steps)
         if best_acc > threshold_acc and average_epoch is None:
             average_epoch = [c.train_epoch for c in clients]
             average_model_size = [np.mean(c.train_bitwidth_hist) for c in clients]
@@ -212,7 +220,7 @@ def exp(root, config, seed):
         average_epoch = [c.train_epoch for c in clients]
         average_model_size = [np.mean(c.train_bitwidth_hist) for c in clients]
 
-    return tloss, tacc, vloss, vacc, average_epoch, average_model_size
+    return tloss, tacc, vloss, vacc, comm, comp
 
 
 
