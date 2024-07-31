@@ -179,7 +179,7 @@ class QDropout(nn.Module):
             act_in, exp_in = input
             self.drop_mask = torch.randint(low=0, high=2, size=(act_in.size(1),))
             self.drop_mask = torch.where(self.drop_mask == 0, torch.tensor(0), torch.tensor(1))
-            return act_in*self.drop_mask.int(), (exp_in[0] * 2, exp_in[1]+1, exp_in[2], exp_in[3])
+            return act_in*self.drop_mask.int(), [exp_in[0] * 2]
         return input
 
     def backward(self, input):
