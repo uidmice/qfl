@@ -9,7 +9,7 @@ from fl_client import *
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--total_steps', type=int, default=70,
+parser.add_argument('--total_steps', type=int, default=100,
                     help="number of rounds of training")
 parser.add_argument('--num_clients', type=int, default=10,
                     help="number of users: K")
@@ -22,7 +22,7 @@ parser.add_argument('--batch_size', type=int, default=64,
 parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
 
-parser.add_argument('--fl', default='fedavg', type=str)
+parser.add_argument('--fl', default='fedasync', type=str)
 parser.add_argument('--niid', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
 
@@ -36,7 +36,7 @@ parser.add_argument('--seeds', type=int, default=[2], nargs='+',
                     help='random seed (default: None)')
 
 parser.add_argument('--model', default=4, type=int)
-parser.add_argument('--qmode', default=1, type=int, help='0: NITI, 1: use int+fp calculation, 2: fp')
+parser.add_argument('--qmode', default=2, type=int, help='0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--dataset', type=str, default='mnist',
                     help='dataset dir')
 parser.add_argument('--initialization', default='uniform', choices=['uniform', 'normal'], type=str)
@@ -65,6 +65,12 @@ b0 = 4
 
 args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
 
+def drop_out(clients, p):
+    s = [0]
+    while sum(s) < 1:
+        s = np.random.rand(len(p))> p
+    return [c for c, d in zip(clients, s) if d]
+
 def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_selection=None,  num_sample=None):
     updates = [] # dequantized 
     loss = []
@@ -85,7 +91,7 @@ def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_
         
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
-        if args.adaptive_bitwidth and bitwidth_selection is not None:
+        if adaptive and args.qmode != 2:
             p[-1] = p[-1] * (1 - 2.0**(1 -bitwidth_selection[i]))
 
         if not isinstance(model, nn_fp):
@@ -127,11 +133,23 @@ def exp(root, config, seed):
     
     server = Server(global_model)
     bitwidth_limits = np.random.randint(b0, 17, args.num_clients)
+    dropout_prob = np.random.uniform(0.6, 0.9, args.num_clients)
+
     with open(save_path+'/bitwidth_limit.txt', 'w') as f:
         f.write(str(bitwidth_limits) + '\n')
     clients = [Client(i, train_data, eval_data, criterion, save_path, bitwidth_limits[i]) 
                for i, train_data, eval_data in zip(list(range(args.num_clients)), train_ds_clients, test_ds_clients)]
     
+    server.update_client_model(clients)
+
+
+    
+    server.selected_clients = drop_out(clients, dropout_prob)
+    if args.adaptive_bitwidth:
+        bitwidth_selecton = [b0 for c in clients]
+    else:
+        bitwidth_selecton = [c.bitwidth_limit for c in clients]
+
     print(server.get_clients_info(clients)[2])
     tloss, tacc, vloss, vacc = [], [], [], []
     best_acc = 0
@@ -142,29 +160,24 @@ def exp(root, config, seed):
     f0 = val_loss
     C = 16/(np.log2(f0+1))
     for steps in range(0, args.total_steps):
-        print(f"Step {steps}")
+        print(f"Step {steps}", len(server.selected_clients), [c.id for c in server.selected_clients])
+        print(f"Bitwidth: {bitwidth_selecton}")
 
-        number_of_clients = int(np.floor(args.num_clients * 0.2))
-
-        server.select_clients_random(steps, clients, number_of_clients)
-
-        if args.qmode == 2:
-            bitwidth_selecton = None
-
-        elif args.adaptive_bitwidth:
-            bm = b0 + int(np.floor(C * np.log2(max(1.0, (f0+1)/(val_loss + 1)))))
-            print(f"bm: {bm}")
-            bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in clients]
-            # p = [(1 - 2.0**(2-bn)) for bn in bitwidth_selecton]
-            # server.select_clients_random(steps, clients, number_of_clients, prob=np.array(p)/np.sum(p))
-        else:
-            bitwidth_selecton = [c.bitwidth_limit for c in server.selected_clients]
-        selected_clients = server.update_client_model(server.selected_clients)
         updates, weights, loss, acc = client_train(server.selected_clients, args.local_ep, args.batch_size, adaptive=args.adaptive_bitwidth,
-                                          bitwidth_selection=bitwidth_selecton)
+                                          bitwidth_selection=[bitwidth_selecton[c.id] for c in server.selected_clients])
 
         averged_update = average_models(updates, weights)
         global_model.load_state_dict(averged_update)
+        server.update_client_model(server.selected_clients)
+
+        if args.adaptive_bitwidth:
+            bm = b0 + int(np.floor(C * np.log2(max(1.0, (f0+1)/(val_loss + 1)))))
+            print(f"bm: {bm}")
+            for c in server.selected_clients:
+                bitwidth_selecton[c.id] = min(bm, c.bitwidth_limit)
+        
+        server.selected_clients = drop_out(clients, dropout_prob)
+
         val_loss, val_prec1= global_model.epoch(test_loader, steps, args.log_interval, criterion, train=False)
 
         writer.add_scalar('Accuracy/train', np.average(acc), steps)
