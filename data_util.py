@@ -136,7 +136,29 @@ def get_fl_dataset(args, num_data_per_client, num_clients):
         train_ds_clients, test_ds_clients, test_ds  = get_mnist_data(args, num_data_per_client, num_clients)
     elif 'femnist' == args.dataset:
         train_ds_clients, test_ds_clients, test_ds  = get_femnist_data(args)
+    elif 'cifar10' in args.dataset:
+        train_ds_clients, test_ds_clients, test_ds  = get_cifar10_data(args, num_data_per_client, num_clients)
     return train_ds_clients, test_ds_clients, test_ds 
+
+
+def get_cifar10_data(args, num_data_per_client, num_clients):
+    norm = dataset_stats['cifar10']
+    train_ds = datasets.CIFAR10('data/cifar10', train=True, download=True, 
+                                     transform=pad_random_crop(input_size=32,
+                                                            scale_size=40, normalize=norm),)
+    test_ds = datasets.CIFAR10('data/cifar10', train=False, download=True, 
+                                    transform=scale_crop(input_size=32,
+                                                        scale_size=32, normalize=norm),)
+    number_data = num_data_per_client * num_clients
+    train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
+    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(number_data/2, len(test_ds)), replace=False))
+    if args.niid:
+        train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
+        test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
+    else:
+        train_ds_clients = iid_samples(train_ds, num_clients)
+        test_ds_clients = iid_samples(test_ds, num_clients)
+    return train_ds_clients, test_ds_clients, test_ds
 
 def get_mnist_data(args, num_data_per_client, num_clients):
     cfg = dataset_cfg[args.dataset]
