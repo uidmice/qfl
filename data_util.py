@@ -150,6 +150,7 @@ def get_cifar10_data(args, num_data_per_client, num_clients):
                                     transform=scale_crop(input_size=32,
                                                         scale_size=32, normalize=norm),)
     number_data = num_data_per_client * num_clients
+    print(len(train_ds), number_data, len(test_ds))
     train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
     test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(int(number_data/2), len(test_ds)), replace=False))
     if args.niid:

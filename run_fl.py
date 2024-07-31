@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--total_steps', type=int, default=70,
                     help="number of rounds of training")
-parser.add_argument('--num_clients', type=int, default=10, nargs='+',
+parser.add_argument('--num_clients', type=int, default=10,
                     help="number of users: K")
 parser.add_argument('--local_ep', type=int, default=6,
                     help="the number of local epochs: E")
