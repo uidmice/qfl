@@ -24,7 +24,7 @@ parser.add_argument('--log_interval', type=int, default=5, metavar='N',
 
 parser.add_argument('--fl', default='fedavg', type=str)
 parser.add_argument('--niid', action='store_true', default=False)
-parser.add_argument('--adaptive_bitwidth', action='store_true', default=True)
+parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
 
 parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
                     help='saved folder')
@@ -84,7 +84,7 @@ def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_
         
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
-        if args.adaptive_bitwidth:
+        if args.adaptive_bitwidth and bitwidth_selection is not None:
             p[-1] = p[-1] * (1 - 2.0**(1 -bitwidth_selection[i]))
 
         if not isinstance(model, nn_fp):
