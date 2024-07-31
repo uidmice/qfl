@@ -8,7 +8,7 @@ __pycache__/
 
 *_results/*
 *.ipynb
-
+*.png
 data/*
 # Distribution / packaging
 .Python

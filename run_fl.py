@@ -62,6 +62,7 @@ device = torch.device(args.device)
 args.device = device
 b0 = 4
 
+
 args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
 
 def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_selection=None,  num_sample=None):
