@@ -194,6 +194,11 @@ def exp(root, config, seed):
         tacc.append(acc)
         vloss.append(val_loss)
         vacc.append(val_prec1)
+        output = root + '/' + config + f'/temp_{seed}_{steps}.pk'
+        pickle.dump([tloss, tacc, vloss, vacc, 
+                     [c.train_epoch for c in clients], [c.train_bitwidth_hist for c in clients]], open(output, 'wb'))
+        torch.save(global_model.model.state_dict(), root + '/' + config + f'/temp_model_{seed}_{steps}.pk')
+        
     
     if average_epoch is None:
         average_epoch = [c.train_epoch for c in clients]
