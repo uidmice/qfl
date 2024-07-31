@@ -151,7 +151,7 @@ def get_cifar10_data(args, num_data_per_client, num_clients):
                                                         scale_size=32, normalize=norm),)
     number_data = num_data_per_client * num_clients
     train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
-    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(number_data/2, len(test_ds)), replace=False))
+    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(int(number_data/2), len(test_ds)), replace=False))
     if args.niid:
         train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
         test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
