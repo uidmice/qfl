@@ -32,7 +32,7 @@ parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--init',
                     help='init ckpt')
-parser.add_argument('--seeds', type=int, default=[0], nargs='+',
+parser.add_argument('--seeds', type=int, default=[2], nargs='+',
                     help='random seed (default: None)')
 
 parser.add_argument('--model', default=4, type=int)
@@ -84,6 +84,8 @@ def client_train(clients, num_epochs=1, batch_size=32, adaptive=False, bitwidth_
         
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
+        if args.adaptive_bitwidth:
+            p[-1] = p[-1] * (1 - 2.0**(1 -bitwidth_selection[i]))
 
         if not isinstance(model, nn_fp):
             model = model.dequantize()
@@ -137,7 +139,7 @@ def exp(root, config, seed):
     average_model_size = None
     val_loss, _ = global_model.epoch(test_loader, 0, args.log_interval, criterion, train=False)
     f0 = val_loss
-    C = f0/(2.0**16) - 0.
+    C = 16/(np.log2(f0+1))
     for steps in range(0, args.total_steps):
         print(f"Step {steps}")
 
@@ -149,11 +151,11 @@ def exp(root, config, seed):
             bitwidth_selecton = None
 
         elif args.adaptive_bitwidth:
-            bm = b0 + int(np.floor(7 * np.log2(2.0 - val_loss/f0) + 7 * np.log2((2 * steps + 1)/(f0 - val_loss + steps + 1))))
+            bm = b0 + int(np.floor(C * np.log2(max(1.0, (f0+1)/(val_loss + 1)))))
             print(f"bm: {bm}")
             bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in clients]
-            p = [(1 - 2.0**(2-bn)) for bn in bitwidth_selecton]
-            server.select_clients_random(steps, clients, number_of_clients, prob=np.array(p)/np.sum(p))
+            # p = [(1 - 2.0**(2-bn)) for bn in bitwidth_selecton]
+            # server.select_clients_random(steps, clients, number_of_clients, prob=np.array(p)/np.sum(p))
         else:
             bitwidth_selecton = [c.bitwidth_limit for c in server.selected_clients]
         selected_clients = server.update_client_model(server.selected_clients)
