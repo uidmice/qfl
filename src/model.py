@@ -55,7 +55,7 @@ class Qnet(nn.Module):
                 state_dict[layer_prefix+'weight_scale']=l.weight_scale[0]
         return state_dict
 
-    def load_state_dict(self,state_dict): #load fp state_dict
+    def load_state_dict(self, state_dict): #load fp state_dict
         for idx,l in enumerate(self.forward_layers):
             if hasattr(l,'weight'):
                 layer_prefix = 'layers.'+str(idx)+'.'
@@ -291,7 +291,14 @@ def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, de
 
 def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, device, Ab=8, Eb=8, m=5, loss='CE'):
     cfg = model_dict[model_id]
-    w_quant = lambda x: fp_quant(x, Wb - 1)
+    if Wb == 1:
+        w_quant = lambda x: torch.where(x > 0, torch.tensor(1), torch.tensor(-1)), [1.0]
+        weight_update = lambda a,b,c,d: NITI_weight_update(a,b,c,d, 7, 2**7-1)
+
+    else:
+        w_quant = lambda x: fp_quant(x, Wb - 1)
+        weight_update = lambda a,b,c,d: NITI_weight_update(a,b,c,d, Wb - m, 2**(Wb-1)-1)
+
     a_quant = lambda x: fp_quant(x, Ab - 1)
     e_quant = lambda x: fp_quant(x, Eb - 1)
     if loss == 'CE':
@@ -299,7 +306,6 @@ def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, device, Ab=8, E
     else:
         loss = QMSELoss(e_quant)
 
-    weight_update = lambda a,b,c,d: NITI_weight_update(a,b,c,d, Wb - m, 2**(Wb-1)-1)
     a_shit = lambda a, s: shift(a,s, Ab - 1)
     e_shift = lambda a, s : shift(a, s, Eb - 1)
     model = nn_q(

@@ -199,7 +199,7 @@ def exp(root, config, seed):
         best_acc = max(val_prec1, best_acc)
         if best_acc > threshold_acc and average_epoch is None:
             average_epoch = [c.train_epoch for c in clients]
-            average_model_size = [np.mean(c.train_bitwidth_hist) for c in clients]
+            average_model_size = [np.mean(c.model_BW_hist) for c in clients]
             logging.info("# of Epochs: %s", average_epoch)
             logging.info("# of Bitwidth: %s", average_model_size)
 
@@ -219,7 +219,7 @@ def exp(root, config, seed):
     
     if average_epoch is None:
         average_epoch = [c.train_epoch for c in clients]
-        average_model_size = [np.mean(c.train_bitwidth_hist) for c in clients]
+        average_model_size = [np.mean(c.model_BW_hist) for c in clients]
 
     return tloss, tacc, vloss, vacc, comm, comp
 

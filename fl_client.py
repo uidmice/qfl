@@ -10,9 +10,11 @@ class Client:
         self.train_data = train_data
         self.eval_data = eval_data
         self.criterion = criterion
+        self.init_model = None
         self.model_path = model_path + f'/client_{client_id}.pth'
         self.bitwidth_limit = bitwidth_limit
-        self.train_bitwidth_hist = []
+        self.model_BW_hist = []
+        self.train_COMM_hist = []
         self.train_epoch = 0
 
     def train(self, model, num_epochs=1, batch_size=32, num_sample=None, num_workers=4):
@@ -22,7 +24,7 @@ class Client:
         train_loader = DataLoader(self.train_data, batch_size=batch_size, sampler=random_sample, num_workers=num_workers)
         self.train_epoch += num_epochs
         for i in range(num_epochs):
-            loss, acc = model.epoch(train_loader, i,  7, self.criterion, train=True)
+            loss, acc = model.epoch(train_loader, i,  5, self.criterion, train=True)
         return loss, acc, model
 
     def test(self, model, set_to_use='test'):
@@ -61,10 +63,3 @@ class Server:
         num_samples = {c.id: len(c.train_data)+ len(c.eval_data) for c in clients}
         return ids, groups, num_samples
     
-
-    def save_model(self, path):
-        """Saves the server model on checkpoints/dataset/model.ckpt."""
-        # Save server model
-        self.client_model.set_params(self.model)
-        model_sess =  self.client_model.sess
-        return self.client_model.saver.save(model_sess, path)
