@@ -41,7 +41,7 @@ def fp_quant_2log(input, bitwidth):
     input_range = torch.max(torch.abs(input))
     input_bitwidth=torch.ceil(torch.log2(input_range))
     act_exp = input_bitwidth - bitwidth
-    round_val = torch.round(input/input_range*(2**bitwidth-1)).int()
+    round_val = torch.round(input/input_range*(2**bitwidth-1))
     return round_val, [2**act_exp]
 
 def int8_quant(input):
@@ -59,7 +59,7 @@ def shift(input, s, target_bitwidth):
 
     
 def int8_clip(input, clip_val=127):
-    return torch.clamp(input,-clip_val, clip_val).int()
+    return torch.clamp(input,-clip_val, clip_val)
 
 def fp_quant(input, bitwidth):
     input_range = torch.max(torch.abs(input))
@@ -74,12 +74,12 @@ def fp_quant_stochastic(input, bitwidth):
 def stochastic_round(t):
     floor = torch.floor(t)
     ceil = torch.ceil(t)
-    return torch.where(torch.rand_like(t) > (t - floor), floor, ceil).int()
+    return torch.where(torch.rand_like(t) > (t - floor), floor, ceil)
 
 def deterministic_round(t):
     floor = torch.floor(t)
     ceil = torch.ceil(t)
-    return torch.where(t - floor<0.5, floor, ceil).int()
+    return torch.where(t - floor<0.5, floor, ceil)
 
 def cov_backward(X, w, E, padding=1, stride=1):
     PX = F.pad(X, (padding, padding, padding, padding))
@@ -90,7 +90,7 @@ def cov_backward(X, w, E, padding=1, stride=1):
     dx = torch.zeros_like(X)
     dW = torch.zeros_like(w)
 
-    x_col = torch.zeros((C * FH * FW, H * W)).int()
+    x_col = torch.zeros((C * FH * FW, H * W))
     w_row = w.reshape(M, C * FH * FW)
 
     for i in range(N):

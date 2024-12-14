@@ -166,3 +166,4 @@ cython_debug/
 #.idea/
 .DS_Store
 mnist_fp.png
+data.zip

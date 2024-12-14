@@ -31,7 +31,7 @@ class QLinear(nn.Module):
         act, act_s = input
 
         if self.bias:
-            act = torch.cat((act, torch.ones(act.shape[0], 1).int()), dim=1)
+            act = torch.cat((act, torch.ones(act.shape[0], 1)), dim=1)
         self.act_in = act, act_s 
 
         out = torch.matmul(act, self.weight.T)
@@ -94,9 +94,9 @@ class QConv2d(nn.Module):
 
         act, act_s = self.act_in
 
-        out = torch.nn.grad.conv2d_input(act.shape, self.weight.float(), 
-                                         err.float(), self.stride, self.padding).int()
-        self.grad = torch.nn.grad.conv2d_weight(act.float(), self.weight.shape, err.float(), self.stride, self.padding) 
+        out = torch.nn.grad.conv2d_input(act.shape, self.weight, 
+                                         err, self.stride, self.padding)
+        self.grad = torch.nn.grad.conv2d_weight(act, self.weight.shape, err, self.stride, self.padding) 
         self.grad_scale = combine_scale(err_s, act_s)
         out_s = combine_scale(err_s, self.weight_scale)
 
@@ -153,7 +153,7 @@ class QFlat(nn.Module):
     def forward(self, input):
         self.act_in = input
         act_in, exp_in = input
-        return act_in.view(act_in.size(0), -1).int(), exp_in
+        return act_in.view(act_in.size(0), -1), exp_in
 
     def backward(self,input):
         '''
@@ -161,7 +161,7 @@ class QFlat(nn.Module):
         '''
         err_in, err_exp = input
         act, _ = self.act_in
-        return err_in.int().view_as(act), err_exp
+        return err_in.view_as(act), err_exp
 
 
     
@@ -179,13 +179,13 @@ class QDropout(nn.Module):
             act_in, exp_in = input
             self.drop_mask = torch.randint(low=0, high=2, size=(act_in.size(1),))
             self.drop_mask = torch.where(self.drop_mask == 0, torch.tensor(0), torch.tensor(1))
-            return act_in*self.drop_mask.int(), [exp_in[0] * 2]
+            return act_in*self.drop_mask, [exp_in[0] * 2]
         return input
 
     def backward(self, input):
         err_in, err_exp = input
         err_out = err_in*self.drop_mask
-        return err_out.int(), err_exp
+        return err_out, err_exp
 
 
 class QCELoss(nn.Module):
