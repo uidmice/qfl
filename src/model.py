@@ -134,7 +134,7 @@ class nn_q(Qnet):
         start_time = time.time()
         for batch_idx, (inputs, target) in enumerate(data_loader):
             output, output_s = self.forward(inputs.to(self.device))
-            loss = criterion(output.float().cpu()*output_s[0], target)
+            loss = criterion(output.float().cpu()*output_s[0].cpu(), target)
             loss_meter.update(float(loss), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
                 acc = accuracy(output.float().cpu()*output_s[0], target)
