@@ -248,13 +248,13 @@ def exp(root, config, seed):
         vloss.append(val_loss)
         vacc.append(val_prec1)
         comm.append(cum_comm)
-        output = root + '/' + config + f'/temp/temp_{seed}_{steps}.pk'
-        pickle.dump([tloss, tacc, vloss, vacc, comm,
-                     [c.train_epoch for c in clients], 
-                     [bs  for c in clients for bs in c.model_BW_hist],
-                     [bs for c in clients for bs in c.train_COMM_hist]
-                     ], open(output, 'wb'))
-        torch.save(global_model.state_dict(), root + '/' + config + f'/temp/model_{seed}_{steps}.pk')
+        # output = root + '/' + config + f'/temp/temp_{seed}_{steps}.pk'
+        # pickle.dump([tloss, tacc, vloss, vacc, comm,
+        #              [c.train_epoch for c in clients], 
+        #              [bs  for c in clients for bs in c.model_BW_hist],
+        #              [bs for c in clients for bs in c.train_COMM_hist]
+        #              ], open(output, 'wb'))
+        # torch.save(global_model.state_dict(), root + '/' + config + f'/temp/model_{seed}_{steps}.pk')
         
     
     if average_epoch is None:
@@ -329,3 +329,13 @@ if __name__ == '__main__':
         output = path + f'/results_seed_{seed}.pk'
         tloss, tacc, vloss, vacc, comm, comp, mem, comm_each = exp(root, config, seed)
         pickle.dump([tloss, tacc, vloss, vacc, comm, comp, mem, comm_each], open(output, 'wb'))
+        file_path = path + '/runs'
+        try:
+            shutil.rmtree(file_path)
+            print(f"File '{file_path}' deleted successfully.")
+        except FileNotFoundError:
+            print(f"File '{file_path}' not found.")
+        except PermissionError:
+            print(f"You don't have permission to delete '{file_path}'.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
