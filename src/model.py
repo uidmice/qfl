@@ -106,7 +106,7 @@ class nn_q(Qnet):
             QLinear(ldim, out_dim, quantizer, weight_update, initialize,bias=use_bias)
         ]
         self.use_bias = use_bias
-        self.forward_layers = nn.Sequential(*layers)
+        self.forward_layers = nn.Sequential(*layers).to(device)
 
     def dequantize(self):
         fp_model = nn_fp(self.channel, self.img_size, self.out_dim, self.cfg, self.device, bias=self.use_bias)
@@ -198,7 +198,7 @@ class nn_fp(nn.Module):
         layers += [
             nn.Linear(ldim, out_dim,bias=False)
         ]
-        self.layers = nn.Sequential(*layers)
+        self.layers = nn.Sequential(*layers).to(device)
         self.setup_optimizer(lr, momentum)
 
     def setup_optimizer(self, lr, momentum):
@@ -327,7 +327,7 @@ def build_model(in_channel, img_dim, out_dim, args):
             model = build_q_model(in_channel, img_dim, out_dim, args.model, 
                                   args.Wbitwidth, args.batch_size, args.lr, args.device, Ab=args.Abitwidth, 
                                   Eb=args.Ebitwidth, stochastic=args.stochastic, loss=loss)
-    return model.to(args.device)
+    return model
 
 # def build_model(in_channel, img_dim, out_dim, args):
 #     cfg = model_dict[args.model]
