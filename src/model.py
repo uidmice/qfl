@@ -145,7 +145,7 @@ class nn_q(Qnet):
             start_time = time.time()
 
             if train:
-                self.backward(target)
+                self.backward(target.to(self.device))
                 if log_interval > 0 and batch_idx % log_interval == 0:
                     print('[{0}][{1:>3}/{2}] '
                         'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) '
