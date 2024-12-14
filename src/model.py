@@ -133,7 +133,7 @@ class nn_q(Qnet):
         loss_meter, acc_meter, time_meter = AverageMeter(), AverageMeter(), AverageMeter()
         start_time = time.time()
         for batch_idx, (inputs, target) in enumerate(data_loader):
-            output, output_s = self.forward(inputs.to(self.device))
+            output, output_s = self.forward(inputs.to(self.device)).cpu()
             loss = criterion(output.float().cpu()*output_s[0].cpu(), target)
             loss_meter.update(float(loss), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
