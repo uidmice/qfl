@@ -42,7 +42,7 @@ parser.add_argument('--total_steps', type=int, default=200,
                     help="number of rounds of training")
 parser.add_argument('--local_ep', type=int, default=1,
                     help="the number of local epochs: E")
-parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedQT-BA', type=str)
+parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedAVG', type=str)
 parser.add_argument('--qmode', default=1, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
@@ -59,7 +59,7 @@ parser.add_argument('--use_bn', action='store_true', default=False)
 
 parser.add_argument('--lr', type=float, default=0.05, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
-parser.add_argument('--device', type=str, default='cpu', metavar='D',)
+parser.add_argument('--device', type=str, default='gpu', metavar='D',)
 parser.add_argument('--num_workers', type=int, default=0, metavar='N',)
 
 args = parser.parse_args()
@@ -91,7 +91,7 @@ def client_train(clients, num_epochs=1, batch_size=32,  bitwidth_selection=None,
         model = build_model(dataset_cfg[args.dataset]['input_channel'], 
                         dataset_cfg[args.dataset]['input_size'], 
                         dataset_cfg[args.dataset]['output_size'], 
-                        args)
+                        args).to(args.device)
         model.load_state_dict(torch.load(c.model_path))
     
         if not isinstance(model, nn_fp):
@@ -126,6 +126,10 @@ def client_train(clients, num_epochs=1, batch_size=32,  bitwidth_selection=None,
                         diff[name] = Q * scale + diff[name].min()
             c.train_COMM_hist.append(bitwidth_selection[i])
             updates.append(diff)
+        
+        if args.device == 'cuda':
+            del model
+            torch.cuda.empty_cache()
 
         loss.append(li)
         acc.append(ai)
