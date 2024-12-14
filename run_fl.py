@@ -59,7 +59,7 @@ parser.add_argument('--use_bn', action='store_true', default=False)
 
 parser.add_argument('--lr', type=float, default=0.05, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
-parser.add_argument('--device', type=str, default='gpu', metavar='D',)
+parser.add_argument('--device', type=str, default='cuda', metavar='D',)
 parser.add_argument('--num_workers', type=int, default=0, metavar='N',)
 
 args = parser.parse_args()
