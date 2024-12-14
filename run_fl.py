@@ -175,7 +175,13 @@ def exp(root, config, seed):
     tloss, tacc, vloss, vacc, comm = [], [], [], [], []
     cum_comm = 0
     best_acc = 0
-    threshold_acc = 95
+
+    if args.dataset == 'mnist':
+        threshold_acc = 95
+    elif args.dataset == 'cifar10':
+        threshold_acc = 60
+    else: # FEMNIST
+        threshold_acc = 82
     average_epoch = None
     average_model_size = None
     average_comm_size = None
@@ -301,8 +307,10 @@ if __name__ == '__main__':
         args.adaptive_bitwidth = True
     elif args.algorithm == 'FedQT':
         args.qmode = 1
+        args.update_mode = 1
     elif args.algorithm == 'FedQT-BA':
         args.qmode = 1
+        args.update_mode = 1
         args.adaptive_bitwidth = True
     else:
         raise ValueError("Algorithm not supported")
