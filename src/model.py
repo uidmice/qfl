@@ -217,7 +217,7 @@ class nn_fp(nn.Module):
         start_time = time.time()
         for batch_idx, (inputs, target) in enumerate(data_loader):
             self.optimizer.zero_grad()
-            output = self.forward(inputs.to(self.device))
+            output = self.forward(inputs.to(self.device)).cpu()
             loss = criterion(output, target)
             loss_meter.update(float(loss.item()), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
