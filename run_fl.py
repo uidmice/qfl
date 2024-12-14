@@ -11,12 +11,9 @@ from fl_client import *
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--total_steps', type=int, default=70,
-                    help="number of rounds of training")
+
 parser.add_argument('--num_clients', type=int, default=10,
                     help="number of users: K")
-parser.add_argument('--local_ep', type=int, default=6,
-                    help="the number of local epochs: E")
 parser.add_argument('--local_data', type=int, default=512,
                     help="local dataset: B")
 parser.add_argument('--batch_size', type=int, default=64,
@@ -31,7 +28,7 @@ parser.add_argument('--init',
                     help='init ckpt')
 
 
-parser.add_argument('--seeds', type=int, default=[1,2,3,4], nargs='+',
+parser.add_argument('--seeds', type=int, default=[0,1,2,3,4], nargs='+',
                     help='random seed (default: None)')
 parser.add_argument('--asynch', action='store_true', default=False)
 parser.add_argument('--niid', action='store_true', default=False)
@@ -41,7 +38,11 @@ parser.add_argument('--dataset', type=str, default='mnist',
                     help='dataset dir')
 parser.add_argument('--model', default=4, type=int)
 
-parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='Q-FedUpdate-BA', type=str)
+parser.add_argument('--total_steps', type=int, default=200,
+                    help="number of rounds of training")
+parser.add_argument('--local_ep', type=int, default=1,
+                    help="the number of local epochs: E")
+parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedQT-BA', type=str)
 parser.add_argument('--qmode', default=1, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
@@ -171,7 +172,8 @@ def exp(root, config, seed):
                for i, train_data, eval_data in zip(list(range(args.num_clients)), train_ds_clients, test_ds_clients)]
     
     print(server.get_clients_info(clients)[2])
-    tloss, tacc, vloss, vacc = [], [], [], []
+    tloss, tacc, vloss, vacc, comm = [], [], [], [], []
+    cum_comm = 0
     best_acc = 0
     threshold_acc = 95
     average_epoch = None
@@ -204,6 +206,7 @@ def exp(root, config, seed):
 
         averged_update = average_models(updates, weights, global_model.state_dict())
         global_model.load_state_dict(averged_update)
+        cum_comm += sum([c.train_COMM_hist[-1] for c in server.selected_clients])
         val_loss, val_prec1= global_model.epoch(test_loader, steps, args.log_interval, criterion, train=False)
 
         writer.add_scalar('Accuracy/train', np.average(acc), steps)
@@ -234,8 +237,9 @@ def exp(root, config, seed):
         tacc.append(acc)
         vloss.append(val_loss)
         vacc.append(val_prec1)
+        comm.append(cum_comm)
         output = root + '/' + config + f'/temp/temp_{seed}_{steps}.pk'
-        pickle.dump([tloss, tacc, vloss, vacc, 
+        pickle.dump([tloss, tacc, vloss, vacc, comm,
                      [c.train_epoch for c in clients], 
                      [bs  for c in clients for bs in c.model_BW_hist],
                      [bs for c in clients for bs in c.train_COMM_hist]
@@ -248,7 +252,7 @@ def exp(root, config, seed):
         average_model_size = [bs  for c in clients for bs in c.model_BW_hist]
         average_comm_size = [bs for c in clients for bs in c.train_COMM_hist]
 
-    return tloss, tacc, vloss, vacc, average_epoch, average_model_size, average_comm_size
+    return tloss, tacc, vloss, vacc, comm, average_epoch, average_model_size, average_comm_size
 
 
 
@@ -311,5 +315,5 @@ if __name__ == '__main__':
     
     for seed in args.seeds:
         output = path + f'/results_seed_{seed}.pk'
-        tloss, tacc, vloss, vacc, comp, mem, comm = exp(root, config, seed)
-        pickle.dump([tloss, tacc, vloss, vacc, comp, mem, comm], open(output, 'wb'))
+        tloss, tacc, vloss, vacc, comm, comp, mem, comm_each = exp(root, config, seed)
+        pickle.dump([tloss, tacc, vloss, vacc, comm, comp, mem, comm_each], open(output, 'wb'))
