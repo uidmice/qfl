@@ -251,7 +251,7 @@ def NITI_weight_update(w, ws, g, gs, m, range):
         return int8_clip(w,range)
     shift = int32_bitwidth - m
     if shift > 1:
-        g = StoShift(g.to(torch.int64), shift.int().item())
+        g = StoShift(g, shift.int().item())
     w = w - g
     return int8_clip(w, range)
  
