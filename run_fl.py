@@ -73,7 +73,7 @@ b0 = 4
 
 # args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
 
-def client_train(clients, num_epochs=1, batch_size=32,  bitwidth_selection=None,  num_sample=None):
+def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_selection=None,  num_sample=None):
     updates = [] # dequantized 
     loss = []
     acc = []
@@ -92,7 +92,7 @@ def client_train(clients, num_epochs=1, batch_size=32,  bitwidth_selection=None,
                         dataset_cfg[args.dataset]['input_size'], 
                         dataset_cfg[args.dataset]['output_size'], 
                         args).to(args.device)
-        model.load_state_dict(torch.load(c.model_path))
+        model.load_state_dict(global_model.state_dict())
     
         if not isinstance(model, nn_fp):
             c.init_model = model.dequantize().state_dict()
@@ -210,8 +210,8 @@ def exp(root, config, seed):
             # server.select_clients_random(steps, clients, number_of_clients, prob=np.array(p)/np.sum(p))
         else:
             bitwidth_selecton = [c.bitwidth_limit for c in server.selected_clients]
-        selected_clients = server.update_client_model(server.selected_clients)
-        updates, weights, loss, acc = client_train(server.selected_clients, args.local_ep, args.batch_size,
+        # selected_clients = server.update_client_model(server.selected_clients)
+        updates, weights, loss, acc = client_train(server.selected_clients, global_model, args.local_ep, args.batch_size, 
                                           bitwidth_selection=bitwidth_selecton)
 
         averged_update = average_models(updates, weights, global_model.state_dict())
