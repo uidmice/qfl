@@ -327,7 +327,7 @@ def build_model(in_channel, img_dim, out_dim, args):
             model = build_q_model(in_channel, img_dim, out_dim, args.model, 
                                   args.Wbitwidth, args.batch_size, args.lr, args.device, Ab=args.Abitwidth, 
                                   Eb=args.Ebitwidth, stochastic=args.stochastic, loss=loss)
-    return model
+    return model.to(args.device)
 
 # def build_model(in_channel, img_dim, out_dim, args):
 #     cfg = model_dict[args.model]
