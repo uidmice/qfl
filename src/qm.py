@@ -29,6 +29,10 @@ class QLinear(nn.Module):
     def forward(self, input):
         """ save activation for backwards """
         act, act_s = input
+        if torch.isnan(act).any():
+            raise ValueError('act: nan in QLinear forward')
+        if torch.isinf(act).any():
+            raise ValueError('act: inf in QLinear forward')
 
         if self.bias:
             act = torch.cat((act, torch.ones(act.shape[0], 1)), dim=1)
@@ -37,6 +41,10 @@ class QLinear(nn.Module):
         out = torch.matmul(act, self.weight.T)
 
         out_s = combine_scale(act_s, self.weight_scale)
+        if torch.isnan(out).any():
+            raise ValueError('out: nan in QLinear forward')
+        if torch.isinf(out).any():
+            raise ValueError('out: inf in QLinear forward')
         return out, out_s
     
 
