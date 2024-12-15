@@ -18,6 +18,8 @@ parser.add_argument('--local_data', type=int, default=512,
                     help="local dataset: B")
 parser.add_argument('--batch_size', type=int, default=64,
                     help="local batch size: B")
+parser.add_argument('--num_batch', type=int, default=80,
+                    help="local batch size: B")
 parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
 
@@ -92,7 +94,7 @@ def exp(root, seed):
 
     train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, 5000, 1)
     train_ds = ConcatDataset(train_ds_clients)
-    random_sample = RandomSampler(train_ds, num_samples=10 * args.batch_size)
+    random_sample = RandomSampler(train_ds, num_samples=args.num_batch * args.batch_size)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, sampler=random_sample)
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False)
     
@@ -100,7 +102,7 @@ def exp(root, seed):
 
     tloss, tacc, vloss, vacc = [], [], [], []
 
-    for epoch in range(0, 70):
+    for epoch in range(0, args.total_steps):
         train_loss, train_prec1= model.epoch(train_loader, epoch, args.log_interval, criterion, train=True)
 
         val_loss, val_prec1= model.epoch(test_loader, epoch, args.log_interval, criterion, train=False)

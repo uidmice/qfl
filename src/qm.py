@@ -194,7 +194,12 @@ class QCELoss(nn.Module):
         self.quantizer = quantizer
 
     def forward(self, out_val, scale, target):
-        x =  F.softmax(out_val * scale[0], dim=-1) - F.one_hot(target, out_val.size(1))
+        x = out_val * scale[0]
+        y = F.softmax(x, dim=-1)
+        while torch.isnan(y).any() or torch.isinf(y).any():
+            x = x / 2
+            y = F.log_softmax(x, dim=-1)
+        x =  y - F.one_hot(target, out_val.size(1))
         return self.quantizer(x)   
 
 class QMSELoss(nn.Module):

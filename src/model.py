@@ -132,6 +132,7 @@ class nn_q(Qnet):
             self.eval()
         loss_meter, acc_meter, time_meter = AverageMeter(), AverageMeter(), AverageMeter()
         start_time = time.time()
+        print(self.device)
         for batch_idx, (inputs, target) in enumerate(data_loader):
             output, output_s = self.forward(inputs.to(self.device))
             output_s = output_s[0].cpu()
