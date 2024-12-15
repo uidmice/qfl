@@ -175,6 +175,7 @@ class nn_q(Qnet):
                 lock = True
         else:
             self.count = 0
+        self.last_loss = loss_meter.avg
         return loss_meter.avg, acc_meter.avg
 
 
