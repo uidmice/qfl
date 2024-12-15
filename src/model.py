@@ -77,8 +77,9 @@ class nn_q(Qnet):
         self.out_dim = out_dim
         self.cfg = cfg
         self.device = device
-        self.stop_count = 4
-
+        self.stop_count = 3
+        self.count = 0
+        self.last_loss = 1000
         layers = []
         ldim = 0
         for x in cfg:
@@ -141,8 +142,7 @@ class nn_q(Qnet):
         loss_meter, acc_meter, time_meter = AverageMeter(), AverageMeter(), AverageMeter()
         start_time = time.time()
 
-        count = 0
-        last_loss = 1000
+
         for batch_idx, (inputs, target) in enumerate(data_loader):
             output, output_s = self.forward(inputs.to(self.device))
             output_s = output_s[0].cpu()
@@ -150,12 +150,6 @@ class nn_q(Qnet):
             if torch.isnan(loss).any():
                 raise ValueError('loss: nan in epoch')
             loss_meter.update(float(loss), inputs.size(0))
-            if float(loss) > last_loss:
-                count += 1
-                if count > self.stop_count:
-                    lock = True
-            else:
-                count = 0
             if  isinstance(criterion, nn.CrossEntropyLoss):
                 acc = accuracy(output.float().cpu()*output_s, target)
                 acc_meter.update(float(acc), inputs.size(0))
@@ -175,6 +169,12 @@ class nn_q(Qnet):
                             batch_time=time_meter,
                             loss=loss_meter,
                             top1=acc_meter))
+        if loss_meter.avg > self.last_loss:
+            self.count += 1
+            if self.count >= self.stop_count:
+                lock = True
+        else:
+            self.count = 0
         return loss_meter.avg, acc_meter.avg
 
 
