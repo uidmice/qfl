@@ -169,16 +169,17 @@ class nn_q(Qnet):
                             batch_time=time_meter,
                             loss=loss_meter,
                             top1=acc_meter))
-        print('loss:', loss_meter.avg, self.last_loss, self.count)
-        if loss_meter.avg > self.last_loss:
-            self.count += 1
-            print('count:', self.count)
-            if self.count >= self.stop_count:
-                lock = True
-                print('locked')
-        else:
-            self.count = 0
-        self.last_loss = loss_meter.avg
+        if train:
+            print('loss:', loss_meter.avg, self.last_loss, self.count)
+            if loss_meter.avg > self.last_loss:
+                self.count += 1
+                print('count:', self.count)
+                if self.count >= self.stop_count:
+                    lock = True
+                    print('locked')
+            else:
+                self.count = 0
+            self.last_loss = loss_meter.avg
         return loss_meter.avg, acc_meter.avg
 
 
