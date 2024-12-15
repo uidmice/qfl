@@ -6,6 +6,7 @@ import collections, time
 from src.ops import *
 from src.meters import accuracy, AverageMeter
 
+lock = False
 model_dict = {
     0: [[32, 3, 1], [64, 3, 1], "M",'F','D', 128],
     8: [[64,3, 1], [64, 3, 1], 'M', [128,3,1], [128,3,1], [128,3,1], 'M', 
@@ -76,6 +77,7 @@ class nn_q(Qnet):
         self.out_dim = out_dim
         self.cfg = cfg
         self.device = device
+        self.stop_count = 4
 
         layers = []
         ldim = 0
@@ -131,12 +133,16 @@ class nn_q(Qnet):
     
 
     def epoch(self, data_loader, epoch, log_interval, criterion, train=True):
+        global lock
         if train:
             self.train()
         else:
             self.eval()
         loss_meter, acc_meter, time_meter = AverageMeter(), AverageMeter(), AverageMeter()
         start_time = time.time()
+
+        count = 0
+        last_loss = 1000
         for batch_idx, (inputs, target) in enumerate(data_loader):
             output, output_s = self.forward(inputs.to(self.device))
             output_s = output_s[0].cpu()
@@ -144,6 +150,12 @@ class nn_q(Qnet):
             if torch.isnan(loss).any():
                 raise ValueError('loss: nan in epoch')
             loss_meter.update(float(loss), inputs.size(0))
+            if float(loss) > last_loss:
+                count += 1
+                if count > self.stop_count:
+                    lock = True
+            else:
+                count = 0
             if  isinstance(criterion, nn.CrossEntropyLoss):
                 acc = accuracy(output.float().cpu()*output_s, target)
                 acc_meter.update(float(acc), inputs.size(0))
@@ -271,11 +283,16 @@ def NITI_weight_update(w, ws, g, gs, m, range):
  
     
 def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
+    global lock
     wn = w * ws[0]
     g = g * gs[0] * lr/bs  
     if g.abs().max() > wn.abs().max()/4:
         g = g * wn.abs().max()/g.abs().max() / 4
     wn = wn - g
+    if lock:
+        print('lock')
+        wt = wn / ws[0]
+        return int8_clip(wt, 2**bitwidth - 1)
     wt, scale = fp_quant_stochastic(wn, bitwidth)
     ws[0] = scale[0]
     return int8_clip(wt, 2**bitwidth - 1)
