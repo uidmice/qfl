@@ -226,6 +226,10 @@ class nn_fp(nn.Module):
         for batch_idx, (inputs, target) in enumerate(data_loader):
             self.optimizer.zero_grad()
             output = self.forward(inputs.to(self.device)).cpu()
+            if torch.isnan(output).any():
+                raise ValueError('output: nan in epoch')
+            if torch.isinf(output).any():
+                raise ValueError('output: inf in epoch')
             loss = criterion(output, target)
             if torch.isnan(loss).any():
                 raise ValueError('loss: nan in epoch')
