@@ -67,11 +67,17 @@ def fp_quant(input, bitwidth):
     return deterministic_round(unround), [input_range/(2**bitwidth - 1)]
 
 def fp_quant_stochastic(input, bitwidth):
+    if torch.isnan(input).any():
+        raise ValueError('fp_quant NaN in input')
+    
     input_range = torch.max(torch.abs(input))
     unround = input/input_range*(2**bitwidth - 1)
+
     return stochastic_round(unround), [input_range/(2**bitwidth - 1)]
     
 def stochastic_round(t):
+    if torch.isnan(t).any():
+        raise ValueError('stochastic NaN in unround')
     floor = torch.floor(t)
     ceil = torch.ceil(t)
     return torch.where(torch.rand_like(t) > (t - floor), floor, ceil)
