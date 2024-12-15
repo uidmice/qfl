@@ -71,10 +71,8 @@ def fp_quant_stochastic(input, bitwidth):
         raise ValueError('fp_quant NaN in input')
     
     input_range = torch.max(torch.abs(input))
-    if torch.isnan(input/input_range).any():
-        print(input_range)
-        print(bitwidth)
-        raise ValueError('fp_quant NaN in input_range')
+    if input_range == 0:
+        return input, [0]
     unround = input/input_range*(2**bitwidth - 1)
 
     return stochastic_round(unround), [input_range/(2**bitwidth - 1)]
