@@ -312,10 +312,10 @@ if __name__ == '__main__':
         args.adaptive_bitwidth = True
     elif args.algorithm == 'FedQT':
         args.qmode = 1
-        args.update_mode = 1
+        args.update_mode = 0
     elif args.algorithm == 'FedQT-BA':
         args.qmode = 1
-        args.update_mode = 1
+        args.update_mode = 0
         args.adaptive_bitwidth = True
     else:
         raise ValueError("Algorithm not supported")
