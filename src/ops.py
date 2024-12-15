@@ -23,7 +23,7 @@ def StoShift(input, shift):
     round_temp = input//(2**shift)
     if shift <= 0:
         return round_temp
-    prob = torch.abs(input - round_temp * (2**shift))
+    prob = torch.abs(input - round_temp * (2**shift)).to(tensor_type)
     rand_num = torch.randint(low = 0, high=2**shift,size=prob.size(), dtype = tensor_type)
     round_decision = torch.where(prob <= rand_num,
                                  torch.tensor(0,dtype=tensor_type),
