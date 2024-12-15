@@ -34,15 +34,15 @@ parser.add_argument('--asynch', action='store_true', default=False)
 parser.add_argument('--niid', action='store_true', default=False)
 # parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
 #                     help='saved folder')
-parser.add_argument('--dataset', type=str, default='mnist',
+parser.add_argument('--dataset', type=str, default='femnist',
                     help='dataset dir')
-parser.add_argument('--model', default=4, type=int)
+parser.add_argument('--model', default=7, type=int)
 
-parser.add_argument('--total_steps', type=int, default=200,
+parser.add_argument('--total_steps', type=int, default=80,
                     help="number of rounds of training")
-parser.add_argument('--local_ep', type=int, default=1,
+parser.add_argument('--local_ep', type=int, default=12,
                     help="the number of local epochs: E")
-parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedAVG', type=str)
+parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedQT-BA', type=str)
 parser.add_argument('--qmode', default=1, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
@@ -101,6 +101,8 @@ def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_se
 
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
+        if torch.isnan(li).any():
+            raise ValueError('loss: nan or inf in CE loss')
 
         if args.adaptive_bitwidth and bitwidth_selection is not None:
             p[-1] = p[-1] * (1 - 2.0**(1 -bitwidth_selection[i]))
@@ -203,7 +205,7 @@ def exp(root, config, seed):
             bitwidth_selecton = None
 
         elif args.adaptive_bitwidth:
-            bm = b0 + int(np.floor(C * np.log2(max(1.0, (f0+1)/(val_loss + 1)))))
+            bm = b0 + int(np.ceil(C * np.log2(max(1.0, (f0+1)/(val_loss + 1)))))
             print(f"bm: {bm}")
             bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in clients]
             # p = [(1 - 2.0**(2-bn)) for bn in bitwidth_selecton]
