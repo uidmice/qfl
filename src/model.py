@@ -216,6 +216,7 @@ class nn_fp(nn.Module):
         return self.layers(x)
     
     def epoch(self, data_loader, epoch, log_interval, criterion, train=True):
+        criterion = nn.NLLLoss()
         if train:
             self.train()
         else:
@@ -225,18 +226,18 @@ class nn_fp(nn.Module):
         start_time = time.time()
         for batch_idx, (inputs, target) in enumerate(data_loader):
             self.optimizer.zero_grad()
-            output = self.forward(inputs.to(self.device)).cpu()
+            output = F.log_softmax(self.forward(inputs.to(self.device))).cpu()
             if torch.isnan(output).any():
                 raise ValueError('output: nan in epoch')
             if torch.isinf(output).any():
                 raise ValueError('output: inf in epoch')
+            
             loss = criterion(output, target)
             if torch.isnan(loss).any():
                 raise ValueError('loss: nan in epoch')
             loss_meter.update(float(loss.item()), inputs.size(0))
-            if  isinstance(criterion, nn.CrossEntropyLoss):
-                acc = accuracy(output.cpu(), target)
-                acc_meter.update(float(acc), inputs.size(0))
+            acc = accuracy(output.cpu(), target)
+            acc_meter.update(float(acc), inputs.size(0))
             time_meter.update(time.time() - start_time)
             start_time = time.time()
 

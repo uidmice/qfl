@@ -218,7 +218,7 @@ class QCELoss(nn.Module):
         x = out_val * scale[0]
         if torch.isnan(x).any() or torch.isinf(x).any():
             raise ValueError('x: nan or inf in CE loss')
-        y = F.softmax(x, dim=-1)
+        y = F.log_softmax(x, dim=-1)
         if torch.isnan(y).any() or torch.isinf(y).any():
             raise ValueError('y: nan or inf in CE loss')
         x =  y - F.one_hot(target, out_val.size(1))
