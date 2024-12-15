@@ -296,9 +296,7 @@ def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
         g = g * wn.abs().max()/g.abs().max() / 4
     wn = wn - g
     if lock:
-        print(lock)
-        wt, scale = fp_quant_stochastic(wn / ws[0], bitwidth)
-        ws[0] = scale[0]
+        wt = stochastic_round(wn / ws[0])
         return int8_clip(wt, 2**bitwidth - 1)
     wt, scale = fp_quant_stochastic(wn, bitwidth)
     ws[0] = scale[0]
