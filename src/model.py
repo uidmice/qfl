@@ -32,7 +32,7 @@ class Qnet(nn.Module):
     def forward(self, x):
         x_data, scale = self.quantizer(x)
         x = x_data, scale
-        print(self.device)
+        print(self.forward_layers.device)
         print(x_data.device)
         self.out, self.out_s = self.forward_layers(x)
         return self.out, self.out_s
@@ -134,7 +134,6 @@ class nn_q(Qnet):
             self.eval()
         loss_meter, acc_meter, time_meter = AverageMeter(), AverageMeter(), AverageMeter()
         start_time = time.time()
-        print(self.device)
         for batch_idx, (inputs, target) in enumerate(data_loader):
             output, output_s = self.forward(inputs.to(self.device))
             output_s = output_s[0].cpu()
