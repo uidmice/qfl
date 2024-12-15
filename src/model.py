@@ -77,7 +77,7 @@ class nn_q(Qnet):
         self.out_dim = out_dim
         self.cfg = cfg
         self.device = device
-        self.stop_count = 3
+        self.stop_count = 1
         self.count = 0
         self.last_loss = 1000
         layers = []
@@ -169,10 +169,13 @@ class nn_q(Qnet):
                             batch_time=time_meter,
                             loss=loss_meter,
                             top1=acc_meter))
+        print('loss:', loss_meter.avg, self.last_loss, self.count)
         if loss_meter.avg > self.last_loss:
             self.count += 1
+            print('count:', self.count)
             if self.count >= self.stop_count:
                 lock = True
+                print('locked')
         else:
             self.count = 0
         self.last_loss = loss_meter.avg
@@ -285,6 +288,7 @@ def NITI_weight_update(w, ws, g, gs, m, range):
     
 def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
     global lock
+    print(lock)
     wn = w * ws[0]
     g = g * gs[0] * lr/bs  
     if g.abs().max() > wn.abs().max()/4:
