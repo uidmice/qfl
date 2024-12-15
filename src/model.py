@@ -270,6 +270,8 @@ def NITI_weight_update(w, ws, g, gs, m, range):
  
     
 def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
+    if bitwidth < 6:
+        lr = lr * 0.5 ** (6 - bitwidth)
     wn = w * ws[0] - g * gs[0] * lr/bs
     wt, scale = fp_quant_stochastic(wn, bitwidth)
     ws[0] = scale[0]
