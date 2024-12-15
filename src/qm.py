@@ -194,11 +194,14 @@ class QCELoss(nn.Module):
         self.quantizer = quantizer
 
     def forward(self, out_val, scale, target):
+        if torch.isnan(out_val).any() or torch.isinf(out_val).any():
+            raise ValueError('out_val: nan or inf in CE loss')
         x = out_val * scale[0]
+        if torch.isnan(x).any() or torch.isinf(x).any():
+            raise ValueError('x: nan or inf in CE loss')
         y = F.softmax(x, dim=-1)
-        while torch.isnan(y).any() or torch.isinf(y).any():
-            x = x / 2
-            y = F.log_softmax(x, dim=-1)
+        if torch.isnan(y).any() or torch.isinf(y).any():
+            raise ValueError('y: nan or inf in CE loss')
         x =  y - F.one_hot(target, out_val.size(1))
         return self.quantizer(x)   
 

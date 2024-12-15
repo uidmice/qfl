@@ -9,6 +9,7 @@ results*
 *_results/*
 *.ipynb
 *.png
+*.pdf
 data/*
 # Distribution / packaging
 .Python
