@@ -141,6 +141,8 @@ class nn_q(Qnet):
             output, output_s = self.forward(inputs.to(self.device))
             output_s = output_s[0].cpu()
             loss = criterion(output.float().cpu()*output_s, target)
+            if torch.isnan(loss).any():
+                raise ValueError('loss: nan in epoch')
             loss_meter.update(float(loss), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
                 acc = accuracy(output.float().cpu()*output_s, target)
@@ -225,6 +227,8 @@ class nn_fp(nn.Module):
             self.optimizer.zero_grad()
             output = self.forward(inputs.to(self.device)).cpu()
             loss = criterion(output, target)
+            if torch.isnan(loss).any():
+                raise ValueError('loss: nan in epoch')
             loss_meter.update(float(loss.item()), inputs.size(0))
             if  isinstance(criterion, nn.CrossEntropyLoss):
                 acc = accuracy(output.cpu(), target)

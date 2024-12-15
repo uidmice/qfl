@@ -101,8 +101,7 @@ def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_se
 
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
         p.append(len(c.train_data))
-        if torch.isnan(li).any():
-            raise ValueError('loss: nan or inf in CE loss')
+
 
         if args.adaptive_bitwidth and bitwidth_selection is not None:
             p[-1] = p[-1] * (1 - 2.0**(1 -bitwidth_selection[i]))
