@@ -38,6 +38,10 @@ class Qnet(nn.Module):
 
     def backward(self, target):
         # x = self.loss(self.out, self.out_s, target)
+        if torch.isnan(self.out).any():
+            raise ValueError('self out: nan in backward')
+        if torch.isinf(self.out).any():
+            raise ValueError('self out: inf in backward')
         x, s = self.loss(self.out, self.out_s, target)
         x = x, s
         for layer in reversed(self.forward_layers):
