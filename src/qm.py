@@ -28,6 +28,7 @@ class QLinear(nn.Module):
 
     def forward(self, input):
         """ save activation for backwards """
+        print('linear')
         act, act_s = input
         if torch.isnan(act).any():
             raise ValueError('linear act: nan in QLinear forward')
@@ -94,6 +95,7 @@ class QConv2d(nn.Module):
     def forward(self, input):
         act, act_s = input
         self.act_in = act, act_s
+        print('conv')
         if torch.isnan(act).any():
             raise ValueError('conv act: nan in QLinear forward')
         if torch.isinf(act).any():
