@@ -271,9 +271,11 @@ def NITI_weight_update(w, ws, g, gs, m, range):
  
     
 def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
-    if bitwidth < 6:
-        lr = lr * 0.5 ** (6 - bitwidth)
-    wn = w * ws[0] - g * gs[0] * lr/bs
+    wn = w * ws[0]
+    g = g * gs[0] * lr/bs
+    if g.abs().max() > wn.abs().max()/4:
+        g = g * wn.abs().max()/g.abs().max() / 4
+    wn = wn - g
     wt, scale = fp_quant_stochastic(wn, bitwidth)
     ws[0] = scale[0]
     return int8_clip(wt, 2**bitwidth - 1)

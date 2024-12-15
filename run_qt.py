@@ -56,7 +56,7 @@ parser.add_argument('--m', default=5, type=int)
 parser.add_argument('--Wbitwidth', default=6, type=int)
 parser.add_argument('--Abitwidth', default=8, type=int)
 parser.add_argument('--Ebitwidth', default=8, type=int)
-parser.add_argument('--stochastic', action='store_true', default=True)
+parser.add_argument('--stochastic', action='store_true', default=False)
 parser.add_argument('--use_bn', action='store_true', default=False)
 
 parser.add_argument('--lr', type=float, default=0.05, metavar='LR')
