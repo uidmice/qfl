@@ -32,8 +32,7 @@ class Qnet(nn.Module):
     def forward(self, x):
         x_data, scale = self.quantizer(x)
         x = x_data, scale
-        print(self.forward_layers.device)
-        print(x_data.device)
+
         self.out, self.out_s = self.forward_layers(x)
         return self.out, self.out_s
 

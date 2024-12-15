@@ -177,7 +177,7 @@ class QDropout(nn.Module):
     def forward(self, input):
         if self.training:
             act_in, exp_in = input
-            self.drop_mask = torch.randint(low=0, high=2, size=(act_in.size(1),))
+            self.drop_mask = torch.randint(low=0, high=2, size=(act_in.size(1),)).to(act_in.device)
             self.drop_mask = torch.where(self.drop_mask == 0, torch.tensor(0), torch.tensor(1))
             return act_in*self.drop_mask, [exp_in[0] * 2]
         return input
