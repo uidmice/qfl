@@ -77,7 +77,7 @@ class nn_q(Qnet):
         self.out_dim = out_dim
         self.cfg = cfg
         self.device = device
-        self.stop_count = 1
+        self.stop_count = 3
         self.count = 0
         self.last_loss = 1000
         layers = []
@@ -296,7 +296,8 @@ def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
     wn = wn - g
     if lock:
         print(lock)
-        wt = fp_quant_stochastic(wn / ws[0], bitwidth)
+        wt, scale = fp_quant_stochastic(wn / ws[0], bitwidth)
+        ws[0] = scale[0]
         return int8_clip(wt, 2**bitwidth - 1)
     wt, scale = fp_quant_stochastic(wn, bitwidth)
     ws[0] = scale[0]
