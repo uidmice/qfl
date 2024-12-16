@@ -5,6 +5,7 @@ from  src.qm import  *
 import collections, time
 from src.ops import *
 from src.meters import accuracy, AverageMeter
+from src.lock import *
 
 model_dict = {
     0: [[32, 3, 1], [64, 3, 1], "M",'F','D', 128],
@@ -133,7 +134,6 @@ class nn_q(Qnet):
     
 
     def epoch(self, data_loader, epoch, log_interval, criterion, train=True):
-        global lock
         if train:
             self.train()
         else:
@@ -276,7 +276,6 @@ def NITI_weight_update(w, ws, g, gs, m, range):
  
     
 def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
-    global lock
 
     if lock:
         g = g * gs[0] * lr/bs / ws[0]

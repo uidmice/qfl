@@ -7,7 +7,7 @@ from src.ops import *
 import argparse, os, pickle, copy
 from src.model import build_fp_model, build_model, nn_fp
 from fl_client import *
-
+from src.lock import *
 
 parser = argparse.ArgumentParser()
 
@@ -72,7 +72,6 @@ args.device = device
 b0 = 4
 
 # args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
-lock = False
 
 
 def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_selection=None,  num_sample=None):
@@ -152,9 +151,9 @@ def average_models(models, weights, global_model_state_dict):
     return state_dict
     
 def exp(root, config, seed):
-    global lock
+    
 
-    lock = False
+    modify_lock(False)
     last_loss = 1000
     count = 0
 
@@ -233,7 +232,7 @@ def exp(root, config, seed):
             count += 1
             print('count:', count)
             if count >= 3:
-                lock = True
+                modify_lock(True)
                 print('locked')
         else:
             count = 0
