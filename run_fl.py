@@ -72,6 +72,8 @@ args.device = device
 b0 = 4
 
 # args.save = f"{args.fl}_{'niid' if args.niid else 'iid'}/{args.dataset}"
+lock = False
+
 
 def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_selection=None,  num_sample=None):
     updates = [] # dequantized 
@@ -150,6 +152,12 @@ def average_models(models, weights, global_model_state_dict):
     return state_dict
     
 def exp(root, config, seed):
+    global lock
+
+    lock = False
+    last_loss = 1000
+    count = 0
+
     writer, save_path = set_save_path(root,  config, seed, args)
 
     set_seed(seed)
@@ -191,6 +199,7 @@ def exp(root, config, seed):
     average_model_size = None
     average_comm_size = None
     val_loss, _ = global_model.epoch(test_loader, 0, args.log_interval, criterion, train=False)
+    last_loss = val_loss
     f0 = val_loss
     C = 16/(np.log2(f0+1))
     for steps in range(0, args.total_steps):
@@ -219,6 +228,16 @@ def exp(root, config, seed):
         global_model.load_state_dict(averged_update)
         cum_comm += sum([c.train_COMM_hist[-1] for c in server.selected_clients])
         val_loss, val_prec1= global_model.epoch(test_loader, steps, args.log_interval, criterion, train=False)
+        print('loss:', val_loss, last_loss, count)
+        if val_loss > last_loss:
+            count += 1
+            print('count:', count)
+            if count >= 3:
+                lock = True
+                print('locked')
+        else:
+            count = 0
+        last_loss = val_loss
 
         writer.add_scalar('Accuracy/train', np.average(acc), steps)
         writer.add_scalar('Loss/train', np.average(loss), steps)

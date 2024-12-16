@@ -6,7 +6,6 @@ import collections, time
 from src.ops import *
 from src.meters import accuracy, AverageMeter
 
-lock = False
 model_dict = {
     0: [[32, 3, 1], [64, 3, 1], "M",'F','D', 128],
     8: [[64,3, 1], [64, 3, 1], 'M', [128,3,1], [128,3,1], [128,3,1], 'M', 
@@ -169,17 +168,6 @@ class nn_q(Qnet):
                             batch_time=time_meter,
                             loss=loss_meter,
                             top1=acc_meter))
-        if train:
-            print('loss:', loss_meter.avg, self.last_loss, self.count)
-            if loss_meter.avg > self.last_loss:
-                self.count += 1
-                print('count:', self.count)
-                if self.count >= self.stop_count:
-                    lock = True
-                    print('locked')
-            else:
-                self.count = 0
-            self.last_loss = loss_meter.avg
         return loss_meter.avg, acc_meter.avg
 
 
