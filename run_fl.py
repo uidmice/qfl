@@ -139,8 +139,12 @@ def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_se
 
 def average_models(models, weights, global_model_state_dict):
     state_dict = {}
+    discard = 0
     for state_dict_c, w in zip(models, weights):
         for para in state_dict_c:
+            if torch.isnan(state_dict_c[para]).any() or torch.isinf(state_dict_c[para]).any():
+                discard += w
+                continue
             if para not in state_dict:
                 state_dict[para] = state_dict_c[para]*w
             else:
@@ -148,6 +152,9 @@ def average_models(models, weights, global_model_state_dict):
     if args.update_mode == 1:
         for para in state_dict:
             state_dict[para] += global_model_state_dict[para]
+    elif discard > 0:
+        for para in state_dict:
+            state_dict[para] /= 1 - discard
     return state_dict
     
 def exp(root, config, seed):

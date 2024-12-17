@@ -232,14 +232,11 @@ class nn_fp(nn.Module):
         for batch_idx, (inputs, target) in enumerate(data_loader):
             self.optimizer.zero_grad()
             output = F.log_softmax(self.forward(inputs.to(self.device))).cpu()
-            if torch.isnan(output).any():
-                raise ValueError('output: nan in epoch')
-            if torch.isinf(output).any():
-                raise ValueError('output: inf in epoch')
             
             loss = criterion(output, target)
             if torch.isnan(loss).any():
-                raise ValueError('loss: nan in epoch')
+                print('loss: nan in epoch')
+                continue
             loss_meter.update(float(loss.item()), inputs.size(0))
             acc = accuracy(output.cpu(), target)
             acc_meter.update(float(acc), inputs.size(0))
