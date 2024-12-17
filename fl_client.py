@@ -25,6 +25,8 @@ class Client:
         self.train_epoch += num_epochs
         for i in range(num_epochs):
             loss, acc = model.epoch(train_loader, i,  5, self.criterion, train=True)
+            if loss is None:
+                return None, None, model
         return loss, acc, model
 
     def test(self, model, set_to_use='test'):

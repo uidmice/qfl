@@ -243,7 +243,7 @@ class nn_fp(nn.Module):
 
             if train:
                 if torch.isnan(loss).any():
-                    continue
+                    return None, None
                 torch.nn.utils.clip_grad_norm_(self.parameters(), 2)
                 loss.backward()
                 self.optimizer.step()

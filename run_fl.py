@@ -101,6 +101,11 @@ def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_se
             c.init_model = copy.deepcopy(model.state_dict())
 
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
+        if li is None:
+            if args.device == 'cuda':
+                del model
+                torch.cuda.empty_cache()
+            continue
         p.append(len(c.train_data))
 
 
