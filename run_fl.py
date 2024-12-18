@@ -79,6 +79,7 @@ def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_se
     loss = []
     acc = []
     p = []
+    valid_clients = []
     for i, c in enumerate(clients):
 
         if args.qmode != 2:
@@ -101,7 +102,7 @@ def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_se
             c.init_model = copy.deepcopy(model.state_dict())
 
         li, ai, model = c.train(model, num_epochs, batch_size, num_sample, num_workers=args.num_workers)
-        if li is None:
+        if li is None or li > 6:
             if args.device == 'cuda':
                 del model
                 torch.cuda.empty_cache()
@@ -140,7 +141,8 @@ def client_train(clients, global_model, num_epochs=1, batch_size=32, bitwidth_se
 
         loss.append(li)
         acc.append(ai)
-    return updates, np.array(p)/np.sum(p), loss, acc
+        valid_clients.append(c)
+    return updates, np.array(p)/np.sum(p), loss, acc, valid_clients
 
 def average_models(models, weights, global_model_state_dict):
     state_dict = {}
@@ -229,15 +231,17 @@ def exp(root, config, seed):
             bitwidth_selecton = [min(bm, c.bitwidth_limit) for c in clients]
             # p = [(1 - 2.0**(2-bn)) for bn in bitwidth_selecton]
             # server.select_clients_random(steps, clients, number_of_clients, prob=np.array(p)/np.sum(p))
+        elif args.algorithm == 'Q-FedUpdate':
+            bitwidth_selecton = [8 for c in server.selected_clients]
         else:
             bitwidth_selecton = [c.bitwidth_limit for c in server.selected_clients]
         # selected_clients = server.update_client_model(server.selected_clients)
-        updates, weights, loss, acc = client_train(server.selected_clients, global_model, args.local_ep, args.batch_size, 
+        updates, weights, loss, acc, updated_clients = client_train(server.selected_clients, global_model, args.local_ep, args.batch_size, 
                                           bitwidth_selection=bitwidth_selecton)
 
         averged_update = average_models(updates, weights, global_model.state_dict())
         global_model.load_state_dict(averged_update)
-        cum_comm += sum([c.train_COMM_hist[-1] for c in server.selected_clients])
+        cum_comm += sum([c.train_COMM_hist[-1] for c in updated_clients])
         val_loss, val_prec1= global_model.epoch(test_loader, steps, args.log_interval, criterion, train=False)
         print('loss:', val_loss, last_loss, count)
         if val_loss > last_loss:
@@ -336,6 +340,7 @@ if __name__ == '__main__':
     elif args.algorithm == 'Q-FedUpdate':
         args.qmode = 0
         args.update_mode = 1
+        args.Wbitwidth = 8
     elif args.algorithm == 'Q-FedUpdate-BA':
         args.qmode = 0
         args.update_mode = 1
