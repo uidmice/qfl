@@ -2,13 +2,13 @@ import torch
 import torchvision.transforms as transforms
 from torchvision import datasets
 from torch.utils.data import Dataset, DataLoader, Subset
+from imagenet_process import get_or_create_selected_classes, random_split_clients, SubclassFilter
 import numpy as np
-import csv
+import csv, shutil
 import json
 import os
 from collections import defaultdict
 
-CWRU_hist = 32
 dataset_stats = {
     'mnist': {'mean': [0.1307], 'std': [0.3081]},
     'cifar10': {'mean': [0.4914, 0.4822, 0.4465], 'std': [0.24703233, 0.24348505, 0.26158768]},
@@ -19,6 +19,8 @@ dataset_cfg = {
     'mnist': {'input_size': 28, 'output_size': 10, 'input_channel': 1},    
     'femnist': {'input_size': 28, 'output_size': 62, 'input_channel': 1},    
     'cifar10': {'input_size': 32, 'output_size': 10, 'input_channel': 3},
+    'imagenet': {'input_size': 64, 'output_size': 50, 'input_channel': 3},
+
 }
 
 def scale_crop(input_size, scale_size, normalize):
@@ -40,64 +42,7 @@ def pad_random_crop(input_size, scale_size, normalize):
         transforms.ToTensor(),
         transforms.Normalize(**normalize),
     ])
-
-def get_dataset(args):
-    if 'mnist' ==  args.dataset:
-        cfg = dataset_cfg[args.dataset]
-        transform = transforms.Compose([
-            transforms.Resize(cfg['input_size']),
-            transforms.ToTensor(),
-        ])
-        norm = dataset_stats['mnist']
-        train_ds = datasets.MNIST('data/mnist', train=True, download=True, 
-                                     transform=scale_crop(input_size=28,
-                                                        scale_size=cfg['input_size'], normalize=norm))
-        test_ds = datasets.MNIST('data/mnist', train=False, download=True, 
-                                    transform=scale_crop(input_size=28,
-                                                        scale_size=cfg['input_size'], normalize=norm))
-
-        if 'binary' in args.dataset:
-            train_ds= [(x,label % 2) for (x,label) in train_ds]
-            test_ds= [(x,label % 2) for (x,label) in test_ds]
-
-    if 'cifar' in args.dataset:
-        norm = dataset_stats['cifar10']
-        
-        train_ds = datasets.CIFAR10('data/cifar10', train=True, download=True, 
-                                     transform=pad_random_crop(input_size=32,
-                                                            scale_size=40, normalize=norm),)
-        test_ds = datasets.CIFAR10('data/cifar10', train=False, download=True, 
-                                    transform=scale_crop(input_size=32,
-                                                        scale_size=32, normalize=norm),)
-    if 'spectrum' in args.dataset:
-        data = np.fromfile('data/Signal_data/USRP_B210_751MHZ_10MS', dtype=np.complex64)
-        I = torch.from_numpy(np.real(data)) * 10
-        Q = torch.from_numpy(np.imag(data)) * 10
-        A = torch.sqrt(I**2 + Q**2)
-        P = torch.atan2(Q, I)
-        I = 2 * (I - I.min()) / (I.max() - I.min()) - 1
-        Q = 2 * (Q - Q.min()) / (Q.max() - Q.min()) - 1
-        A = 2 * (A - A.min()) / (A.max() - A.min()) - 1
-        P = 2 * (P - P.min()) / (P.max() - P.min()) - 1
-        data = torch.stack([I, Q, A, P], dim=1).flatten()
-        test_data = int(len(data) * 0.15)
-        # test_data = 10000
-        train_data = len(data) - test_data
-        train_ds = Dataset_Custom(data[:train_data], 64)
-        test_ds = Dataset_Custom(data[train_data:], 64)
-
-    if 'CWRU' in args.dataset:
-        a = csv.reader(open('data/motor/X097_FE_time.txt', 'r'), delimiter=',')
-        data = []
-        for row in a:
-            data += [float(row[0])]
-        data = torch.tensor(data)
-        data = 2 * (data - data.min()) / (data.max() - data.min()) - 1
-        train_data = int(len(data) * 0.8)
-        train_ds = Dataset_Custom(data[:train_data], CWRU_hist)
-        test_ds = Dataset_Custom(data[train_data:], CWRU_hist)
-    return train_ds, test_ds
-
+    
 def iid_samples(dataset, num_users):
     total_indices = np.arange(len(dataset))
     np.random.shuffle(total_indices)
@@ -138,6 +83,8 @@ def get_fl_dataset(args, num_data_per_client, num_clients):
         train_ds_clients, test_ds_clients, test_ds  = get_femnist_data(args)
     elif 'cifar10' == args.dataset:
         train_ds_clients, test_ds_clients, test_ds  = get_cifar10_data(args, num_data_per_client, num_clients)
+    elif 'imagenet' == args.dataset:
+        train_ds_clients, test_ds_clients, test_ds  = get_imagenet_data(args, num_data_per_client, num_clients)
     return train_ds_clients, test_ds_clients, test_ds 
 
 
@@ -176,7 +123,7 @@ def get_mnist_data(args, num_data_per_client, num_clients):
                                                     scale_size=cfg['input_size'], normalize=norm))
     number_data = num_data_per_client * num_clients
     train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
-    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(number_data*2, len(test_ds)), replace=False))
+    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(int(number_data/2), len(test_ds)), replace=False))
     if args.niid:
         train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
         test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
@@ -185,6 +132,35 @@ def get_mnist_data(args, num_data_per_client, num_clients):
         test_ds_clients = iid_samples(test_ds, num_clients)
     return train_ds_clients, test_ds_clients, test_ds
 
+def get_imagenet_data(args, num_data_per_client, num_clients):
+    data_dir = 'data/tiny-imagenet-200'
+    if not os.path.exists(data_dir):
+        raise FileNotFoundError(f"Directory {data_dir} does not exist.")
+
+    transform = transforms.Compose([
+        transforms.Resize((64, 64)),
+        transforms.ToTensor(),
+    ])
+
+    train_dir = data_dir + '/train'
+    val_dir = data_dir + '/val'
+    class_file = 'selected_classes.json'
+
+    # Get selected classes
+    selected_classes = get_or_create_selected_classes(train_dir, class_file)
+
+    train_ds = SubclassFilter(train_dir, selected_classes, transform)
+    test_ds = SubclassFilter(val_dir, selected_classes, transform)   
+
+    if args.niid:
+        train_ds_clients = dirichlet_sample(train_ds, num_clients, 50)
+        test_ds_clients = dirichlet_sample(test_ds, num_clients, 50)
+    else:
+        train_ds_clients = random_split_clients(train_ds, num_clients, num_data_per_client)
+        test_ds_clients = random_split_clients(test_ds, num_clients, len(test_ds)//num_clients)
+
+    return train_ds_clients, test_ds_clients, test_ds
+    
 def read_dir(data_dir):
     clients = []
     data = defaultdict(lambda : None)

@@ -12,9 +12,9 @@ from src.lock import *
 parser = argparse.ArgumentParser()
 
 
-parser.add_argument('--num_clients', type=int, default=10,
+parser.add_argument('--num_clients', type=int, default=5,
                     help="number of users: K")
-parser.add_argument('--local_data', type=int, default=512,
+parser.add_argument('--local_data', type=int, default=2000,
                     help="local dataset: B")
 parser.add_argument('--batch_size', type=int, default=64,
                     help="local batch size: B")
@@ -34,9 +34,9 @@ parser.add_argument('--asynch', action='store_true', default=False)
 parser.add_argument('--niid', action='store_true', default=False)
 # parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
 #                     help='saved folder')
-parser.add_argument('--dataset', type=str, default='femnist',
+parser.add_argument('--dataset', type=str, default='imagenet',
                     help='dataset dir')
-parser.add_argument('--model', default=7, type=int)
+parser.add_argument('--model', default=9, type=int)
 
 parser.add_argument('--total_steps', type=int, default=80,
                     help="number of rounds of training")
