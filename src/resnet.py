@@ -9,12 +9,13 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, 
                                stride=stride, padding=padding, bias=False)
-
+        self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
         
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, 
                                stride=1, padding=1, bias=False)
-        
+        self.bn2 = nn.BatchNorm2d(out_channels)
+      
         self.downsample = None
         if stride != 1 or in_channels != out_channels:
             # When dimensions do not match, we apply a 1x1 convolution.
@@ -25,9 +26,11 @@ class BasicBlock(nn.Module):
         identity = x
         
         out = self.conv1(x)
+        out = self.bn1(out)
         out = self.relu(out)
         
         out = self.conv2(out)        
+        out = self.bn2(out)
         if self.downsample is not None:
             identity = self.downsample(x)
         

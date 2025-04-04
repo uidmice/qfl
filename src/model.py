@@ -24,7 +24,7 @@ model_dict = {
     7: [[32, 5, 2],"M", [64, 5, 2], "M", 'F', 2048], # leaf femnist cnn
     9: [[64, 3, 1], [64, 3, 1], 'M', [128,3,1], [128,3,1], 'M', 
         [256,3,1], [256,3,1], 'M', 'F', 'D',512, 128],
-    10: [[64, 3, 1], ['R', 64, 2, 1],['R', 128, 2, 2], ['R', 256, 2, 2], 
+    10: [[64, 3, 1],'N', ['R', 64, 2, 1],['R', 128, 2, 2], ['R', 256, 2, 2], 
         ['R', 512, 2, 2], 'A', 'F'], # ResNet 18
 }
 
@@ -208,6 +208,8 @@ class nn_fp(nn.Module):
             elif x == 'A':
                 layers += [nn.AdaptiveAvgPool2d((1, 1))]
                 img_size = 1
+            elif x == 'N':
+                layers += [nn.BatchNorm2d(channel)]
             else:
                 if ldim == 0:
                     if img_size > 0:
@@ -276,8 +278,8 @@ class nn_fp(nn.Module):
                             batch_time=time_meter,
                             loss=loss_meter,
                             top1=acc_meter))
-        if train and self.scheduler is not None:
-            self.scheduler.step()
+        # if train and self.scheduler is not None:
+        #     self.scheduler.step()
         return loss_meter.avg, acc_meter.avg
     
 
