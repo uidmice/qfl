@@ -143,7 +143,14 @@ def get_imagenet_data(args, num_data_per_client, num_clients):
         transforms.Normalize(mean=[0.480, 0.448, 0.398],  
                          std=[0.277, 0.269, 0.282]),
     ])
-
+    train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),                 # good for natural images
+        transforms.RandomRotation(10),                     
+        transforms.Resize((64, 64)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.480, 0.448, 0.398],  
+                         std=[0.277, 0.269, 0.282]),
+    ])
     train_dir = data_dir + '/train'
     val_dir = data_dir + '/val'
     class_file = 'selected_classes.json'
@@ -151,7 +158,7 @@ def get_imagenet_data(args, num_data_per_client, num_clients):
     # Get selected classes
     selected_classes = get_or_create_selected_classes(train_dir, class_file)
 
-    train_ds = SubclassFilter(train_dir, selected_classes, transform)
+    train_ds = SubclassFilter(train_dir, selected_classes, train_transform)
     test_ds = SubclassFilter(val_dir, selected_classes, transform)   
 
     if args.niid:
