@@ -373,8 +373,6 @@ def build_model(in_channel, img_dim, out_dim, args):
         model = build_fp_model(in_channel, img_dim, out_dim, args.model, args.lr, args.device, momentum=args.momentum, use_bn=False)
     else:
         loss = 'CE'
-        if args.dataset == 'spectrum' or args.dataset == 'CWRU':
-            loss = 'MSE'
         if args.qmode == 0: # NITI
             model = build_NITI_model(in_channel, img_dim, out_dim, args.model, 
                                      args.Wbitwidth, args.device,  Ab=args.Abitwidth, Eb=args.Ebitwidth, m=args.m, loss=loss)

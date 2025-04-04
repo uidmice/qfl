@@ -7,16 +7,13 @@ from src.ops import *
 import argparse, os, pickle, copy
 from src.model import build_fp_model, build_model, nn_fp
 from fl_client import *
-from src.lock import *
 
 parser = argparse.ArgumentParser()
 
 
 parser.add_argument('--num_clients', type=int, default=5,
                     help="number of users: K")
-parser.add_argument('--local_data', type=int, default=2000,
-                    help="local dataset: B")
-parser.add_argument('--batch_size', type=int, default=64,
+parser.add_argument('--batch_size', type=int, default=128,
                     help="local batch size: B")
 parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
@@ -42,7 +39,7 @@ parser.add_argument('--total_steps', type=int, default=80,
                     help="number of rounds of training")
 parser.add_argument('--local_ep', type=int, default=12,
                     help="the number of local epochs: E")
-parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedQT-BA', type=str)
+parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedAVG', type=str)
 parser.add_argument('--qmode', default=1, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
@@ -166,8 +163,6 @@ def average_models(models, weights, global_model_state_dict):
     
 def exp(root, config, seed):
     
-
-    modify_lock(False)
     last_loss = 1000
     count = 0
 
@@ -176,7 +171,7 @@ def exp(root, config, seed):
     set_seed(seed)
 
     
-    train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, args.local_data, args.num_clients)
+    train_ds_clients, test_ds_clients, train_ds, test_ds  = get_fl_dataset(args, args.num_clients)
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=args.num_workers)
     
     
@@ -246,10 +241,6 @@ def exp(root, config, seed):
         print('loss:', val_loss, last_loss, count)
         if val_loss > last_loss:
             count += 1
-            print('count:', count)
-            if count >= 3:
-                modify_lock(True)
-                print('locked')
         else:
             count = 0
         last_loss = val_loss

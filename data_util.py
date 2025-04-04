@@ -77,19 +77,19 @@ def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
             client_indices[client_idx].extend(indices)
     return  [Subset(dataset, indices) for indices in client_indices]
     
-def get_fl_dataset(args, num_data_per_client, num_clients):
+def get_fl_dataset(args, num_clients):
     if 'mnist' == args.dataset:
-        train_ds_clients, test_ds_clients, test_ds  = get_mnist_data(args, num_data_per_client, num_clients)
+        train_ds_clients, test_ds_clients, train_ds, test_ds  = get_mnist_data(args, num_clients)
     elif 'femnist' == args.dataset:
-        train_ds_clients, test_ds_clients, test_ds  = get_femnist_data(args)
+        train_ds_clients, test_ds_clients, train_ds, test_ds  = get_femnist_data(args)
     elif 'cifar10' == args.dataset:
-        train_ds_clients, test_ds_clients, test_ds  = get_cifar10_data(args, num_data_per_client, num_clients)
+        train_ds_clients, test_ds_clients, train_ds, test_ds  = get_cifar10_data(args, num_clients)
     elif 'imagenet' == args.dataset:
-        train_ds_clients, test_ds_clients, test_ds  = get_imagenet_data(args, num_data_per_client, num_clients)
-    return train_ds_clients, test_ds_clients, test_ds 
+        train_ds_clients, test_ds_clients, train_ds, test_ds  = get_imagenet_data(args, num_clients)
+    return train_ds_clients, test_ds_clients, train_ds, test_ds 
 
 
-def get_cifar10_data(args, num_data_per_client, num_clients):
+def get_cifar10_data(args, num_clients):
     norm = dataset_stats['cifar10']
     train_ds = datasets.CIFAR10('data/cifar10', train=True, download=True, 
                                      transform=pad_random_crop(input_size=32,
@@ -97,19 +97,14 @@ def get_cifar10_data(args, num_data_per_client, num_clients):
     test_ds = datasets.CIFAR10('data/cifar10', train=False, download=True, 
                                     transform=scale_crop(input_size=32,
                                                         scale_size=32, normalize=norm),)
-    number_data = num_data_per_client * num_clients
-    print(len(train_ds), number_data, len(test_ds))
-    train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
-    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(int(number_data/2), len(test_ds)), replace=False))
     if args.niid:
         train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
-        test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
     else:
         train_ds_clients = iid_samples(train_ds, num_clients)
         test_ds_clients = iid_samples(test_ds, num_clients)
-    return train_ds_clients, test_ds_clients, test_ds
+    return train_ds_clients, test_ds_clients, train_ds, test_ds
 
-def get_mnist_data(args, num_data_per_client, num_clients):
+def get_mnist_data(args, num_clients):
     cfg = dataset_cfg[args.dataset]
     transform = transforms.Compose([
         transforms.Resize(cfg['input_size']),
@@ -122,18 +117,14 @@ def get_mnist_data(args, num_data_per_client, num_clients):
     test_ds = datasets.MNIST('data/mnist', train=False, download=True, 
                                 transform=scale_crop(input_size=28,
                                                     scale_size=cfg['input_size'], normalize=norm))
-    number_data = num_data_per_client * num_clients
-    train_ds = Subset(train_ds, np.random.choice(len(train_ds), number_data, replace=False))
-    test_ds = Subset(test_ds, np.random.choice(len(test_ds), min(int(number_data/2), len(test_ds)), replace=False))
     if args.niid:
         train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
-        test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
     else:
         train_ds_clients = iid_samples(train_ds, num_clients)
         test_ds_clients = iid_samples(test_ds, num_clients)
-    return train_ds_clients, test_ds_clients, test_ds
+    return train_ds_clients, test_ds_clients, train_ds, test_ds
 
-def get_imagenet_data(args, num_data_per_client, num_clients):
+def get_imagenet_data(args,  num_clients):
     dataset = load_dataset("benjamin-paine/imagenet-1k-64x64")
     train_subset, val_subset, selected_classes, label_map = get_or_create_selected_classes(dataset, save_path="selected_classes.json", num_selected=50)
     train_transform = transforms.Compose([
@@ -147,26 +138,13 @@ def get_imagenet_data(args, num_data_per_client, num_clients):
         transforms.ToTensor(),
         transforms.Normalize((0.5,), (0.5,))
     ])
-    def transform_train(example):
-    # Applies training augmentation to the image.
-        example["image"] = train_transform(example["image"])
-        return example
 
-    def transform_val(example):
-        # Applies validation transform to the image.
-        example["image"] = val_transform(example["image"])
-        return example
-
-    # train_ds = train_subset.with_transform(transform_train)
-    # test_ds = val_subset.with_transform(transform_val)
-    # train_ds_clients = split_dataset(train_ds, num_clients, num_data_per_client)
-    # test_ds_clients = split_dataset(test_ds, num_clients)
     train_ds = HFDatasetWrapper(train_subset, transform=train_transform)
     test_ds = HFDatasetWrapper(val_subset, transform=val_transform)
-    # train_ds = MultiAugmentDataset(train_ds, n_views=3)
-    train_ds_clients = random_split_clients(train_ds, num_clients, num_data_per_client)
-    test_ds_clients = random_split_clients(test_ds, num_clients, len(test_ds)//num_clients)
-    return train_ds_clients, test_ds_clients, test_ds
+    if not args.niid:
+        train_ds_clients = random_split_clients(train_ds, num_clients)
+        test_ds_clients = random_split_clients(test_ds, num_clients)
+    return train_ds_clients, test_ds_clients, train_ds, test_ds
 
 
 

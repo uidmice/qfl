@@ -137,27 +137,12 @@ class SubclassFilter(ImageFolder):
         self.classes = classes_to_keep
         self.class_to_idx = {cls: i for i, cls in enumerate(classes_to_keep)}
 
-def random_split_clients(dataset, n_clients, m):
-    """
-    Randomly splits `dataset` into n_clients non-overlapping subsets, each with m data points.
-    Note: n_clients * m must be <= len(dataset).
-    
-    Returns:
-        dict: mapping client_id -> Subset(dataset, indices)
-    """
-    total_needed = n_clients * m
-    if total_needed > len(dataset):
-        raise ValueError(f"Not enough data in the dataset: {len(dataset)} available, but {total_needed} required.")
+def random_split_clients(dataset, n_clients):
+    m = len(dataset) // n_clients
 
-    # Randomly select total_needed unique indices
-    indices = np.random.permutation(len(dataset))[:total_needed]
-    
-    # Split indices into n_clients parts, each of size m
+    indices = np.random.permutation(len(dataset))
     client_indices = {i: indices[i * m:(i + 1) * m].tolist() for i in range(n_clients)}
-    
-    # Create a dictionary of Subset datasets for each client
     client_datasets = [ Subset(dataset, client_indices[client_id]) for client_id in range(n_clients)] 
-
     return client_datasets
 
 class MultiAugmentDataset(Dataset):

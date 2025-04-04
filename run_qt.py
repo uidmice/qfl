@@ -92,8 +92,7 @@ def exp(root, seed):
 
     criterion = nn.CrossEntropyLoss()
 
-    train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, 60000, 1)
-    train_ds = train_ds_clients[0]
+    train_ds_clients, test_ds_clients,  train_ds, test_ds  = get_fl_dataset(args, 1)
     random_sample = RandomSampler(train_ds, num_samples=args.num_batch * args.batch_size)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, sampler=random_sample)
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False)
