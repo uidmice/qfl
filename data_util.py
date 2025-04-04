@@ -2,7 +2,7 @@ import torch
 import torchvision.transforms as transforms
 from torchvision import datasets
 from torch.utils.data import Dataset, DataLoader, Subset
-from imagenet_process import get_or_create_selected_classes, random_split_clients, SubclassFilter
+from imagenet_process import get_or_create_selected_classes, random_split_clients, SubclassFilter, MultiAugmentDataset
 import numpy as np
 import csv, shutil
 import json
@@ -137,20 +137,26 @@ def get_imagenet_data(args, num_data_per_client, num_clients):
     if not os.path.exists(data_dir):
         raise FileNotFoundError(f"Directory {data_dir} does not exist.")
 
-    transform = transforms.Compose([
-        transforms.Resize((64, 64)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.480, 0.448, 0.398],  
-                         std=[0.277, 0.269, 0.282]),
-    ])
+
     train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),                 # good for natural images
-        transforms.RandomRotation(10),                     
+        transforms.Resize((64, 64)),
+        transforms.RandomCrop(64, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(10),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
+    ])
+
+    # Use a simpler transform for validation (no randomness)
+    val_transform = transforms.Compose([
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.480, 0.448, 0.398],  
-                         std=[0.277, 0.269, 0.282]),
+        transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
     ])
+
+
+# Datasets
     train_dir = data_dir + '/train'
     val_dir = data_dir + '/val'
     class_file = 'selected_classes.json'
@@ -159,7 +165,9 @@ def get_imagenet_data(args, num_data_per_client, num_clients):
     selected_classes = get_or_create_selected_classes(train_dir, class_file)
 
     train_ds = SubclassFilter(train_dir, selected_classes, train_transform)
-    test_ds = SubclassFilter(val_dir, selected_classes, transform)   
+    test_ds = SubclassFilter(val_dir, selected_classes, val_transform)   
+    train_ds = MultiAugmentDataset(train_ds, n_views=3)  # For example, 3 augmented views per image
+
 
     if args.niid:
         train_ds_clients = dirichlet_sample(train_ds, num_clients, 50)

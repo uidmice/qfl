@@ -4,7 +4,7 @@ import shutil, random
 from torchvision.datasets import ImageFolder
 
 from torchvision import transforms
-from torch.utils.data import Subset, DataLoader
+from torch.utils.data import Subset, DataLoader, Dataset
 import numpy as np
 import matplotlib.pyplot as plt
 from torchvision.utils import make_grid
@@ -88,6 +88,30 @@ def random_split_clients(dataset, n_clients, m):
 
     return client_datasets
 
+class MultiAugmentDataset(Dataset):
+    """
+    Wraps a base dataset to return multiple augmented views of each sample.
+    This effectively increases the number of samples by a factor of n_views.
+    """
+    def __init__(self, base_dataset, n_views=2):
+        self.base_dataset = base_dataset
+        self.n_views = n_views
+
+    def __len__(self):
+        # Effective length is increased by n_views
+        return len(self.base_dataset) * self.n_views
+
+    def __getitem__(self, index):
+        # Map index to an original sample
+        orig_index = index % len(self.base_dataset)
+        # Get the sample's path and label from the base dataset
+        path, label = self.base_dataset.samples[orig_index]
+        # Load the image using the same loader as the base dataset
+        image = self.base_dataset.loader(path)
+        # Apply the transform (which is stochastic) to generate an augmented view
+        img = self.base_dataset.transform(image)
+        return img, label
+
 def check_samples_per_class(dataset, n_samples=3):
     """
     For each class in the dataset, randomly sample n_samples images,
@@ -130,15 +154,29 @@ class_file = 'data/tiny-imagenet-200/selected_classes.json'
 # Get selected classes
 selected_classes = get_or_create_selected_classes(train_dir, class_file)
 
-# Transforms
-transform = transforms.Compose([
+train_transform = transforms.Compose([
     transforms.Resize((64, 64)),
+    transforms.RandomCrop(64, padding=4),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(10),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
     transforms.ToTensor(),
+    # Optionally add normalization with Tiny ImageNet stats:
+    transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
 ])
 
+# Use a simpler transform for validation (no randomness)
+val_transform = transforms.Compose([
+    transforms.Resize((64, 64)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
+])
+
+
 # Datasets
-train_ds = SubclassFilter(train_dir, selected_classes, transform)
-test_ds = SubclassFilter(val_dir, selected_classes, transform)   
+train_ds = SubclassFilter(train_dir, selected_classes, train_transform)
+test_ds = SubclassFilter(val_dir, selected_classes, val_transform)   
+augmented_train_ds = MultiAugmentDataset(train_ds, n_views=3)  # For example, 3 augmented views per image
 
 print(f"Filtered dataset contains {len(train_ds)} images.")
 print(f"Filtered validation dataset contains {len(test_ds)} images.")
