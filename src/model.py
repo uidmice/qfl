@@ -250,7 +250,7 @@ class nn_fp(nn.Module):
         start_time = time.time()
         for batch_idx, (inputs, target) in enumerate(data_loader):
             self.optimizer.zero_grad()
-            output = F.log_softmax(self.forward(inputs.to(self.device))).cpu()
+            output = F.log_softmax(self.forward(inputs.to(self.device))/2).cpu()
             loss = criterion(output, target)
 
             
@@ -263,7 +263,7 @@ class nn_fp(nn.Module):
             if train:
                 if torch.isnan(loss).any():
                     return None, None
-                torch.nn.utils.clip_grad_norm_(self.parameters(), 2)
+                torch.nn.utils.clip_grad_norm_(self.parameters(), 1.5)
                 loss.backward()
                 self.optimizer.step()
                 if log_interval>0 and batch_idx % log_interval == 0:
@@ -276,6 +276,8 @@ class nn_fp(nn.Module):
                             batch_time=time_meter,
                             loss=loss_meter,
                             top1=acc_meter))
+        if train and self.scheduler is not None:
+            self.scheduler.step()
         return loss_meter.avg, acc_meter.avg
     
 
