@@ -16,9 +16,9 @@ parser.add_argument('--num_clients', type=int, default=1,
                     help="number of users: K")
 parser.add_argument('--local_data', type=int,
                     help="local dataset: B")
-parser.add_argument('--batch_size', type=int, default=64,
+parser.add_argument('--batch_size', type=int, default=128,
                     help="local batch size: B")
-parser.add_argument('--num_batch', type=int, default=80,
+parser.add_argument('--num_batch', type=int, default=200,
                     help="local batch size: B")
 parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
@@ -92,7 +92,7 @@ def exp(root, seed):
 
     criterion = nn.CrossEntropyLoss()
 
-    train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, 10000, 1)
+    train_ds_clients, test_ds_clients, test_ds  = get_fl_dataset(args, 100000, 1)
     train_ds = train_ds_clients[0]
     random_sample = RandomSampler(train_ds, num_samples=args.num_batch * args.batch_size)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, sampler=random_sample)

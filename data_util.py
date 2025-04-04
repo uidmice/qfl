@@ -2,7 +2,7 @@ import torch
 import torchvision.transforms as transforms
 from torchvision import datasets
 from torch.utils.data import Dataset, DataLoader, Subset
-from imagenet_process import get_or_create_selected_classes, split_dataset, random_split_clients
+from imagenet_process import get_or_create_selected_classes, split_dataset, random_split_clients, MultiAugmentDataset
 from datasets import load_dataset
 import numpy as np
 import csv, shutil
@@ -163,6 +163,7 @@ def get_imagenet_data(args, num_data_per_client, num_clients):
     # test_ds_clients = split_dataset(test_ds, num_clients)
     train_ds = HFDatasetWrapper(train_subset, transform=train_transform)
     test_ds = HFDatasetWrapper(val_subset, transform=val_transform)
+    train_ds = MultiAugmentDataset(train_ds, n_views=3)
     train_ds_clients = random_split_clients(train_ds, num_clients, num_data_per_client)
     test_ds_clients = random_split_clients(test_ds, num_clients, len(test_ds)//num_clients)
     return train_ds_clients, test_ds_clients, test_ds
