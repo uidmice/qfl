@@ -1,35 +1,71 @@
-import os, json
+import os, json, io
 import shutil, random
-
+from datasets import load_dataset
 from torchvision.datasets import ImageFolder
-
+from PIL import Image
 from torchvision import transforms
 from torch.utils.data import Subset, DataLoader, Dataset
 import numpy as np
 import matplotlib.pyplot as plt
 from torchvision.utils import make_grid
 
+# dataset = load_dataset("benjamin-paine/imagenet-1k-64x64")
+# val_dir = 'data/tiny-imagenet-200/val'
+# img_dir = os.path.join(val_dir, 'images')
+# ann_file = os.path.join(val_dir, 'val_annotations.txt')
+# if  os.path.exists(img_dir):
+# # Create class folders
+#     with open(ann_file, 'r') as f:
+#         for line in f:
+#             img_name, class_name = line.strip().split('\t')[:2]
+#             class_dir = os.path.join(val_dir, class_name)
+#             if not os.path.exists(class_dir):
+#                 os.makedirs(class_dir)
+#             src = os.path.join(img_dir, img_name)
+#             dst = os.path.join(class_dir, img_name)
+#             shutil.move(src, dst)
+#     # Remove old images/ directory
+#     shutil.rmtree(img_dir)
 
-val_dir = 'data/tiny-imagenet-200/val'
-img_dir = os.path.join(val_dir, 'images')
-ann_file = os.path.join(val_dir, 'val_annotations.txt')
-if  os.path.exists(img_dir):
-# Create class folders
-    with open(ann_file, 'r') as f:
-        for line in f:
-            img_name, class_name = line.strip().split('\t')[:2]
-            class_dir = os.path.join(val_dir, class_name)
-            if not os.path.exists(class_dir):
-                os.makedirs(class_dir)
-            src = os.path.join(img_dir, img_name)
-            dst = os.path.join(class_dir, img_name)
-            shutil.move(src, dst)
-    # Remove old images/ directory
-    shutil.rmtree(img_dir)
+# random.seed(42)
+def get_or_create_selected_classes(dataset,save_path="selected_classes.json",  num_selected=50, seed=42):
 
-random.seed(42)
+    # If the selection file exists, load the selected class indices.
+    if os.path.exists(save_path):
+        with open(save_path, "r") as f:
+            selected_classes = json.load(f)
+            selected_classes = selected_classes["selected_classes"]
+        print("Loaded selected classes from file.")
+    else:
+        # Determine total number of classes from the train split.
+        total_classes = len(dataset["train"].features["label"].names)
+        random.seed(seed)
+        selected_classes = random.sample(range(total_classes), num_selected)
+        # Save the selected classes for future use.
+        with open(save_path, "w") as f:
+            json.dump({"selected_classes": selected_classes}, f)
+        print("Selected classes saved to file.")
+        # Filter function: only include examples with labels in selected_classes.
+    
+    def is_selected(example):
+        return example["label"] in selected_classes
+    
+    train_subset = dataset["train"].filter(is_selected)
+    val_subset = dataset["validation"].filter(is_selected)
+    
+    # Remap labels to a contiguous range [0, num_selected-1]
+    label_map = {old_label: new_label for new_label, old_label in enumerate(sorted(selected_classes))}
+    
+    def remap_label(example):
+        example["label"] = label_map[example["label"]]
+        return example
+    
+    train_subset = train_subset.map(remap_label)
+    val_subset = val_subset.map(remap_label)
+    
+    return train_subset, val_subset, selected_classes, label_map
 
-def get_or_create_selected_classes(train_dir, save_path='selected_classes.json', num_classes=50):
+def get_or_create_selected_classes_dir(train_dir, save_path='selected_classes.json', num_classes=50):
     if os.path.exists(save_path):
         with open(save_path, 'r') as f:
             selected_classes = json.load(f)
@@ -43,6 +79,42 @@ def get_or_create_selected_classes(train_dir, save_path='selected_classes.json',
             print(f"Saved {len(selected_classes)} classes to {save_path}")
     return selected_classes
 
+def split_dataset(dataset, n_clients, data_per_client=None):
+    total = len(dataset)
+    indices = list(range(total))
+    random.shuffle(indices)
+    client_datasets = []
+    split_size = total // n_clients
+    if data_per_client and data_per_client < split_size:
+        split_size = data_per_client
+
+    for i in range(n_clients):
+        if i == n_clients - 1:
+            client_indices = indices[i * split_size:]
+        else:
+            client_indices = indices[i * split_size: (i + 1) * split_size]
+        client_datasets.append(dataset.select(client_indices))
+    
+    return client_datasets
+
+def to_pil_image(img):
+    # If the image is a dict (common with datasets library),
+    # try to convert it using the "bytes" or "path" keys.
+    if isinstance(img, dict):
+        if "bytes" in img:
+            return Image.open(io.BytesIO(img["bytes"]))
+        elif "path" in img:
+            return Image.open(img["path"])
+        else:
+            raise ValueError("Image dict does not contain 'bytes' or 'path'.")
+    # If it's already a PIL Image, return it as is.
+    if isinstance(img, Image.Image):
+        return img
+    # Optionally, if it's a numpy array or something else, convert it.
+    try:
+        return Image.fromarray(img)
+    except Exception as e:
+        raise TypeError(f"Unsupported image type: {type(img)}") from e
 
 class SubclassFilter(ImageFolder):
     def __init__(self, root, classes_to_keep, transform=None):
@@ -147,46 +219,46 @@ def check_samples_per_class(dataset, n_samples=3):
         plt.show()
 
 # Paths
-train_dir = 'data/tiny-imagenet-200/train'
-val_dir = 'data/tiny-imagenet-200/val'
-class_file = 'data/tiny-imagenet-200/selected_classes.json'
+# train_dir = 'data/tiny-imagenet-200/train'
+# val_dir = 'data/tiny-imagenet-200/val'
+# class_file = 'data/tiny-imagenet-200/selected_classes.json'
 
-# Get selected classes
-selected_classes = get_or_create_selected_classes(train_dir, class_file)
+# # Get selected classes
+# selected_classes = get_or_create_selected_classes(train_dir, class_file)
 
-train_transform = transforms.Compose([
-    transforms.Resize((64, 64)),
-    transforms.RandomCrop(64, padding=4),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(10),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-    transforms.ToTensor(),
-    # Optionally add normalization with Tiny ImageNet stats:
-    transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
-])
+# train_transform = transforms.Compose([
+#     transforms.Resize((64, 64)),
+#     transforms.RandomCrop(64, padding=4),
+#     transforms.RandomHorizontalFlip(),
+#     transforms.RandomRotation(10),
+#     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+#     transforms.ToTensor(),
+#     # Optionally add normalization with Tiny ImageNet stats:
+#     transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
+# ])
 
-# Use a simpler transform for validation (no randomness)
-val_transform = transforms.Compose([
-    transforms.Resize((64, 64)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
-])
+# # Use a simpler transform for validation (no randomness)
+# val_transform = transforms.Compose([
+#     transforms.Resize((64, 64)),
+#     transforms.ToTensor(),
+#     transforms.Normalize(mean=[0.480, 0.448, 0.398], std=[0.277, 0.269, 0.282]),
+# ])
 
 
-# Datasets
-train_ds = SubclassFilter(train_dir, selected_classes, train_transform)
-test_ds = SubclassFilter(val_dir, selected_classes, val_transform)   
-augmented_train_ds = MultiAugmentDataset(train_ds, n_views=3)  # For example, 3 augmented views per image
+# # Datasets
+# train_ds = SubclassFilter(train_dir, selected_classes, train_transform)
+# test_ds = SubclassFilter(val_dir, selected_classes, val_transform)   
+# augmented_train_ds = MultiAugmentDataset(train_ds, n_views=3)  # For example, 3 augmented views per image
 
-print(f"Filtered dataset contains {len(train_ds)} images.")
-print(f"Filtered validation dataset contains {len(test_ds)} images.")
+# print(f"Filtered dataset contains {len(train_ds)} images.")
+# print(f"Filtered validation dataset contains {len(test_ds)} images.")
 
-# Parameters for client splitting
-n_clients = 10   # Number of clients
-m = 1000        # Number of data points per client
+# # Parameters for client splitting
+# n_clients = 10   # Number of clients
+# m = 1000        # Number of data points per client
 
-# Randomly split the dataset into n_clients, each with m data points
-client_datasets = random_split_clients(train_ds, n_clients, m)
+# # Randomly split the dataset into n_clients, each with m data points
+# client_datasets = random_split_clients(train_ds, n_clients, m)
 
 
 # Visualize some sample images from the training and validation datasets
