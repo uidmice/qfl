@@ -140,6 +140,8 @@ def get_imagenet_data(args, num_data_per_client, num_clients):
     transform = transforms.Compose([
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
+        transforms.Normalize(mean=[0.480, 0.448, 0.398],  
+                         std=[0.277, 0.269, 0.282]),
     ])
 
     train_dir = data_dir + '/train'
