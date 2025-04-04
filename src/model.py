@@ -234,7 +234,7 @@ class nn_fp(nn.Module):
 
     def setup_optimizer(self, lr, momentum):
         self.optimizer = optim.SGD(self.parameters(), lr=lr, momentum=momentum)
-        self.scheduler = StepLR(self.optimizer, step_size=30, gamma=0.1)
+        self.scheduler = StepLR(self.optimizer, step_size=50, gamma=0.5)
 
     def forward(self, x):
         return self.layers(x)
