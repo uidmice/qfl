@@ -24,7 +24,7 @@ model_dict = {
     7: [[32, 5, 2],"M", [64, 5, 2], "M", 'F', 2048], # leaf femnist cnn
     9: [[64, 3, 1], [64, 3, 1], 'M', [128,3,1], [128,3,1], 'M', 
         [256,3,1], [256,3,1], 'M', 'F', 'D',512, 128],
-    10: [[64, 3, 1],'N', ['R', 64, 2, 1],['R', 128, 2, 2], ['R', 256, 2, 2], 
+    10: [[64, 3, 1, 'N'], ['R', 64, 2, 1],['R', 128, 2, 2], ['R', 256, 2, 2], 
         ['R', 512, 2, 2], 'A', 'F'], # ResNet 18
 }
 
@@ -197,9 +197,11 @@ class nn_fp(nn.Module):
                     channel = x[1]
                     img_size = img_size // x[3]
                 else:
-                    layers += [nn.Conv2d(channel, x[0], kernel_size=x[1], padding=x[2], bias=False),
-                            nn.ReLU()]
+                    layers += [nn.Conv2d(channel, x[0], kernel_size=x[1], padding=x[2], bias=False)]
                     channel = x[0]
+                    if x[-1] == 'N':
+                        layers += [nn.BatchNorm2d(channel)]
+                    layers += [nn.ReLU()]
                     img_size = (img_size + 2*x[2] - x[1]) + 1
             elif x == 'F':
                 layers += [nn.Flatten()]
@@ -208,8 +210,6 @@ class nn_fp(nn.Module):
             elif x == 'A':
                 layers += [nn.AdaptiveAvgPool2d((1, 1))]
                 img_size = 1
-            elif x == 'N':
-                layers += [nn.BatchNorm2d(channel)]
             else:
                 if ldim == 0:
                     if img_size > 0:
