@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('--num_clients', type=int, default=10,
                     help="number of users: K")
-parser.add_argument('--local_data', type=int, default=512,
+parser.add_argument('--local_data', type=int, default=2000,
                     help="local dataset: B")
 parser.add_argument('--batch_size', type=int, default=64,
                     help="local batch size: B")
@@ -36,16 +36,16 @@ parser.add_argument('--asynch', action='store_true', default=False)
 parser.add_argument('--niid', action='store_true', default=False)
 # parser.add_argument('--save', metavar='SAVE', default='fedavg_niid/mnist',
 #                     help='saved folder')
-parser.add_argument('--dataset', type=str, default='mnist',
+parser.add_argument('--dataset', type=str, default='imagenet',
                     help='dataset dir')
-parser.add_argument('--model', default=4, type=int)
+parser.add_argument('--model', default=10, type=int)
 
 parser.add_argument('--total_steps', type=int, default=200,
                     help="number of rounds of training")
 parser.add_argument('--local_ep', type=int, default=1,
                     help="the number of local epochs: E")
 parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedAVG', type=str)
-parser.add_argument('--qmode', default=0, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
+parser.add_argument('--qmode', default=2, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
 parser.add_argument('--update_mode', default=0, type=int, help='0: model update, 1: gradient update')
@@ -59,7 +59,7 @@ parser.add_argument('--Ebitwidth', default=8, type=int)
 parser.add_argument('--stochastic', action='store_true', default=False)
 parser.add_argument('--use_bn', action='store_true', default=False)
 
-parser.add_argument('--lr', type=float, default=0.05, metavar='LR')
+parser.add_argument('--lr', type=float, default=0.01, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
 parser.add_argument('--device', type=str, default='cuda', metavar='D',)
 parser.add_argument('--num_workers', type=int, default=0, metavar='N',)

@@ -7,6 +7,7 @@ import collections, time
 from src.ops import *
 from src.meters import accuracy, AverageMeter
 from src.lock import *
+from src.resnet import ResLayer
 
 model_dict = {
     0: [[32, 3, 1], [64, 3, 1], "M",'F','D', 128],
@@ -23,6 +24,8 @@ model_dict = {
     7: [[32, 5, 2],"M", [64, 5, 2], "M", 'F', 2048], # leaf femnist cnn
     9: [[64, 3, 1], [64, 3, 1], 'M', [128,3,1], [128,3,1], 'M', 
         [256,3,1], [256,3,1], 'M', 'F', 'D',512, 128],
+    10: [[64, 3, 1], ['R', 64, 2, 1],['R', 128, 2, 2], ['R', 256, 2, 2], 
+        ['R', 512, 2, 2], 'A', 'F'], # ResNet 18
 }
 
 
@@ -189,14 +192,22 @@ class nn_fp(nn.Module):
                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
                 img_size = img_size // 2
             elif isinstance(x, list):
-                layers += [nn.Conv2d(channel, x[0], kernel_size=x[1], padding=x[2], bias=False),
-                           nn.ReLU()]
-                channel = x[0]
-                img_size = (img_size + 2*x[2] - x[1]) + 1
+                if x[0] == 'R':
+                    layers += [ResLayer(channel, x[1], x[2], x[3])]
+                    channel = x[1]
+                    img_size = img_size // x[3]
+                else:
+                    layers += [nn.Conv2d(channel, x[0], kernel_size=x[1], padding=x[2], bias=False),
+                            nn.ReLU()]
+                    channel = x[0]
+                    img_size = (img_size + 2*x[2] - x[1]) + 1
             elif x == 'F':
                 layers += [nn.Flatten()]
             elif x == 'D':
                 layers += [nn.Dropout(0.5)]
+            elif x == 'A':
+                layers += [nn.AdaptiveAvgPool2d((1, 1))]
+                img_size = 1
             else:
                 if ldim == 0:
                     if img_size > 0:
@@ -210,7 +221,11 @@ class nn_fp(nn.Module):
                     layers += [nn.Linear(ldim, x, bias = bias),
                            nn.ReLU()]
                     ldim = x
-
+        if ldim == 0:
+            if img_size > 0:
+                ldim = channel * img_size * img_size
+            else:
+                ldim = channel
         layers += [
             nn.Linear(ldim, out_dim,bias=False)
         ]
