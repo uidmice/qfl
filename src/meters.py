@@ -72,6 +72,9 @@ def accuracy(output, target):
     batch_size = target.size(0)
 
     pred = output.argmax(dim=1, keepdim=True)
+    print(output.argmax(dim=1, keepdim=False))
+    print(target.view_as(output.argmax(dim=1, keepdim=False)))
+
     correct = pred.eq(target.view_as(pred)).sum().item()
 
     return correct * 100.0 / batch_size
