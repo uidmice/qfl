@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
 from  src.qm import  *
 import collections, time
 from src.ops import *
@@ -218,6 +219,7 @@ class nn_fp(nn.Module):
 
     def setup_optimizer(self, lr, momentum):
         self.optimizer = optim.SGD(self.parameters(), lr=lr, momentum=momentum)
+        self.scheduler = StepLR(self.optimizer, step_size=30, gamma=0.1)
 
     def forward(self, x):
         return self.layers(x)
