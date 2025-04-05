@@ -86,6 +86,9 @@ def exp(root, seed):
                         args).to(args.device)
     
     model.load_state_dict(fp_model.state_dict())
+    for name, param in model.named_parameters():
+        print(f"{name} is on {param.device}")
+
 
     best_prec1 = 0
 
