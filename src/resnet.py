@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-
+from src.qm import *
 
 class BasicBlock(nn.Module):    
     def __init__(self, in_channels, out_channels, stride, kernel_size=3, padding=1):
@@ -21,6 +21,7 @@ class BasicBlock(nn.Module):
             # When dimensions do not match, we apply a 1x1 convolution.
             self.downsample = nn.Conv2d(in_channels, out_channels, kernel_size=1, 
                           stride=stride, bias=False)
+            
     
     def forward(self, x):
         identity = x
@@ -37,7 +38,57 @@ class BasicBlock(nn.Module):
         out += identity
         out = self.relu(out)
         return out
+    
+class QBasicBlock(nn.Module):
+    def __init__(self,in_channels, out_channels, stride, kernel_size, padding,
+                  quantizer, weight_update, forward_rescale, backward_rescale):
+        super().__init__()
+        self.conv1 = QConv2d(in_channels, out_channels, kernel_size,
+                             stride, padding, quantizer, weight_update)
+        self.bn1 = QBatchNorm2d(out_channels,  weight_update, forward_rescale, backward_rescale)
+        self.relu = QReLU(forward_rescale, backward_rescale)
 
+        self.conv2 = QConv2d(out_channels, out_channels, kernel_size,
+                             1, 1, quantizer, weight_update)
+        self.bn2 = QBatchNorm2d(out_channels,  weight_update, forward_rescale, backward_rescale)
+
+        self.downsample = None
+        if stride != 1 or in_channels != out_channels:
+            # When dimensions do not match, we apply a 1x1 convolution.
+            self.downsample =QConv2d(in_channels, out_channels, 1,
+                             stride, 0, quantizer, weight_update)
+        self.backward_rescale = backward_rescale
+
+    def forward(self, x):
+        x0, s0 = x
+        
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        
+        out = self.conv2(out)        
+        x1, s1 = self.bn2(out)
+        if self.downsample is not None:
+            x0, s0 = self.downsample(x)
+        
+        out = x1 * s1 + x0 * s0
+        out = out, 1
+        return self.relu(out)
+    
+    def backward(self, err):
+        e = self.relu.backward(err)
+
+        e1 = self.bn2.backward(e)
+        e1 = self.conv2.backward(e1)
+        e1 = self.relu.backward(e1)
+        e1 = self.bn1.backward(e1)
+        e1 = self.conv1.backward(e1)
+        if self.downsample is not None:
+            e = self.downsample.backward(e)
+        
+        e = e1[0] * e1[1] + e[0] * e[1]
+        return self.backward_rescale(e, 1)
+            
 class ResLayer(nn.Module):
     def __init__(self, in_channels, out_channels, num_blocks, stride):
         super(ResLayer, self).__init__()
@@ -51,6 +102,28 @@ class ResLayer(nn.Module):
     
     def forward(self, x):
         return self.blocks(x)
+
+    
+class QResLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, num_blocks, stride, kernel_size, padding,
+                  quantizer, weight_update, forward_rescale, backward_rescale ):
+        super(QResLayer, self).__init__()
+        layers = []
+        layers.append(QBasicBlock(in_channels, out_channels, stride, kernel_size, padding,
+                  quantizer, weight_update, forward_rescale, backward_rescale))
+        # Remaining blocks keep the same dimensions.
+        for _ in range(1, num_blocks):
+            layers.append(QBasicBlock(out_channels, out_channels, 1, kernel_size, padding,
+                  quantizer, weight_update, forward_rescale, backward_rescale))
+        self.blocks = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        return self.blocks(x)
+    
+    def backward(self, err):
+        for block in reversed(self.blocks):
+            err = block.backward(err)
+        return err
 
 
 class ResNet18Tiny(nn.Module):

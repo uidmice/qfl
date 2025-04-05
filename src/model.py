@@ -7,7 +7,7 @@ import collections, time
 from src.ops import *
 from src.meters import accuracy, AverageMeter
 from src.lock import *
-from src.resnet import ResLayer
+from src.resnet import ResLayer, QResLayer
 
 model_dict = {
     0: [[32, 3, 1], [64, 3, 1], "M",'F','D', 128],
@@ -25,7 +25,8 @@ model_dict = {
     9: [[64, 3, 1], [64, 3, 1], 'M', [128,3,1], [128,3,1], 'M', 
         [256,3,1], [256,3,1], 'M', 'F', 'D',512, 128],
     10: [[64, 3, 1,'N'] , ['R', 64, 2, 1],['R', 128, 2, 2], ['R', 256, 2, 2], 
-        ['R', 512, 2, 2], 'A','D', 'F'], # ResNet 18
+        ['R', 512, 2, 2], 'A', 'F','D'], # ResNet 18
+    11: [[6, 5, 2], "M", [16, 5, 0, 'N'], "M",'A', 'F', 120, 84 ], #test
 }
 
 
@@ -45,10 +46,6 @@ class Qnet(nn.Module):
 
     def backward(self, target):
         # x = self.loss(self.out, self.out_s, target)
-        if torch.isnan(self.out).any():
-            raise ValueError('self out: nan in backward')
-        if torch.isinf(self.out).any():
-            raise ValueError('self out: inf in backward')
         x, s = self.loss(self.out, self.out_s, target)
         x = x, s
         for layer in reversed(self.forward_layers):
@@ -63,16 +60,29 @@ class Qnet(nn.Module):
         for idx,l in enumerate(self.forward_layers):
             if hasattr(l,'weight'):
                 layer_prefix = 'layers.'+str(idx)+'.'
-                state_dict[layer_prefix+'weight']=l.weight
-                state_dict[layer_prefix+'weight_scale']=l.weight_scale[0]
+                if hasattr(l, 'weight_scale'):
+                    state_dict[layer_prefix+'weight']=l.weight
+                    state_dict[layer_prefix+'weight_scale']=l.weight_scale[0]
+                else:
+                    state_dict[layer_prefix+'weight']=l.weight
+                    state_dict[layer_prefix+'bias']=l.bias
+                    state_dict[layer_prefix+'running_mean']=l.running_mean
+                    state_dict[layer_prefix+'running_var']=l.running_var
         return state_dict
 
     def load_state_dict(self, state_dict): #load fp state_dict
         for idx,l in enumerate(self.forward_layers):
             if hasattr(l,'weight'):
                 layer_prefix = 'layers.'+str(idx)+'.'
-                l.weight = state_dict[layer_prefix+'weight']
-                l.weight, l.weight_scale=l.quantizer(l.weight)
+                if hasattr(l,'weight_scale'):
+                    l.weight = state_dict[layer_prefix+'weight']
+                    l.weight, l.weight_scale=l.quantizer(l.weight)
+                else:
+                    l.weight = state_dict[layer_prefix+'weight']
+                    l.bias = state_dict[layer_prefix+'bias']
+                    l.running_mean = state_dict[layer_prefix+'running_mean']
+                    l.running_var = state_dict[layer_prefix+'running_var']
+
 
 class nn_q(Qnet):
     def __init__(self, channel, img_size, out_dim, cfg, loss, 
@@ -93,15 +103,28 @@ class nn_q(Qnet):
                 layers += [QMaxpool2d(kernel_size=2, stride=2)]
                 img_size = img_size // 2
             elif isinstance(x, list):
-                layers += [QConv2d(channel, x[0], kernel_size=x[1], stride=1, padding=x[2], quantizer=quantizer, 
-                                   weight_update=weight_update, initialize=initialize),
-                           QReLU(forward_shift, backward_shift)]
-                channel = x[0]
-                img_size = (img_size + 2*x[2] - x[1]) + 1
+                if x[0] == 'R':
+                    layers += [QResLayer(channel, x[1], x[2], x[3], 3, 1,
+                  quantizer, weight_update, forward_shift, backward_shift)]
+                    channel = x[1]
+                    img_size = img_size // x[3]
+                else:
+                    layers += [QConv2d(channel, x[0], kernel_size=x[1], stride=1, padding=x[2], quantizer=quantizer, 
+                                    weight_update=weight_update, initialize=initialize)]
+                    channel = x[0]
+                    if x[-1] == 'N':
+                        layers += [QBatchNorm2d(channel, weight_update, forward_shift, backward_shift)]
+                    layers += [QReLU(forward_shift, backward_shift)]
+                    img_size = (img_size + 2*x[2] - x[1]) + 1
             elif x == 'F':
                 layers += [QFlat()]
             elif x == 'D':
                 layers += [QDropout(0.1)]
+            elif x == 'A':
+                layers += [QGlobalPool2d(forward_shift, backward_shift)]
+                img_size = 1
+            elif x == 'N':
+                layers += [QBatchNorm2d(channel, weight_update, forward_shift, backward_shift)]
             else:
                 if ldim == 0:
                     if img_size > 0:
@@ -116,6 +139,11 @@ class nn_q(Qnet):
                            QReLU(forward_shift, backward_shift)]
                     ldim = x
 
+        if ldim == 0:
+            if img_size > 0:
+                ldim = channel * img_size * img_size
+            else:
+                ldim = channel
         layers += [
             QLinear(ldim, out_dim, quantizer, weight_update, initialize,bias=use_bias)
         ]
@@ -129,12 +157,18 @@ class nn_q(Qnet):
         for idx,l in enumerate(fp_model.layers):
             if hasattr(l,'weight'):
                 layer_prefix = 'layers.'+str(idx)+'.'
-                data = state_dict[layer_prefix+'weight'] * state_dict[layer_prefix+'weight_scale']
-                if l.bias:
-                    new_dict[layer_prefix+'weight']=data[:,:-1]
-                    new_dict[layer_prefix+'bias']=data[:,-1]
+                if layer_prefix+'weight_scale' in state_dict:
+                    data = state_dict[layer_prefix+'weight'] * state_dict[layer_prefix+'weight_scale']
+                    if l.bias:
+                        new_dict[layer_prefix+'weight']=data[:,:-1]
+                        new_dict[layer_prefix+'bias']=data[:,-1]
+                    else:
+                        new_dict[layer_prefix+'weight']=data
                 else:
-                    new_dict[layer_prefix+'weight']=data
+                    new_dict[layer_prefix+'weight']=state_dict[layer_prefix+'weight']
+                    new_dict[layer_prefix+'bias']=state_dict[layer_prefix+'bias']
+                    new_dict[layer_prefix+'running_mean']=state_dict[layer_prefix+'running_mean']
+                    new_dict[layer_prefix+'running_var']=state_dict[layer_prefix+'running_var']
         fp_model.load_state_dict(new_dict)
         return fp_model
     
@@ -150,7 +184,7 @@ class nn_q(Qnet):
 
         for batch_idx, (inputs, target) in enumerate(data_loader):
             output, output_s = self.forward(inputs.to(self.device))
-            output_s = output_s[0].cpu()
+            output_s = output_s.cpu()
             loss = criterion(output.float().cpu()*output_s, target)
             if torch.isnan(loss).any():
                 raise ValueError('loss: nan in epoch')
@@ -283,9 +317,6 @@ class nn_fp(nn.Module):
         if train and self.scheduler is not None:
             self.scheduler.step()
         return loss_meter.avg, acc_meter.avg
-    
-
-
 
 def NITI_weight_update(w, ws, g, gs, m, range):
     int32_bitwidth = get_bitwidth(g)
@@ -295,17 +326,17 @@ def NITI_weight_update(w, ws, g, gs, m, range):
     if shift > 1:
         g = StoShift(g, shift.int().item())
     w = w - g
-    return int8_clip(w, range)
+    return int8_clip(w, range), ws
  
     
 def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
 
     if lock:
-        g = g * gs[0] * lr/bs / ws[0]
+        g = g * gs * lr/bs / ws
         return NITI_weight_update(w, ws, g, gs, 5, 2**bitwidth-1)
     
-    wn = w * ws[0]
-    g = g * gs[0] * lr/bs  
+    wn = w * ws
+    g = g * gs * lr/bs  
     if g.abs().max() > wn.abs().max()/4:
         g = g * wn.abs().max()/g.abs().max() / 4
     wn = wn - g
@@ -313,8 +344,7 @@ def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
     #     wt = stochastic_round(wn / ws[0])
     #     return int8_clip(wt, 2**bitwidth - 1)
     wt, scale = fp_quant_stochastic(wn, bitwidth)
-    ws[0] = scale[0]
-    return int8_clip(wt, 2**bitwidth - 1)
+    return int8_clip(wt, 2**bitwidth - 1), scale
 
 def build_fp_model(in_channel, img_dim, out_dim, model_id, lr, device, momentum=0, use_bn=False):
     cfg = model_dict[model_id]
@@ -337,8 +367,8 @@ def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, de
         loss = QMSELoss(e_quant)
         
     weight_update = lambda a, b, c, d: fp_weight_update(a,b,c,d, Wb - 1, batch_size, lr)
-    a_rescale = lambda a, s: a_quant(a*s[0])
-    e_rescale = lambda a, s: e_quant(a*s[0])
+    a_rescale = lambda a, s: a_quant(a*s)
+    e_rescale = lambda a, s: e_quant(a*s)
     model = nn_q(in_channel, img_dim, out_dim, cfg, loss, weight_update, a_rescale, e_rescale, 
                 a_quant, w_quant, 'uniform', device, use_bias=False)
     return model

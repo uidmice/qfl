@@ -12,8 +12,7 @@ from torch.utils.data import ConcatDataset
 parser = argparse.ArgumentParser()
 
 
-parser.add_argument('--num_clients', type=int, default=1,
-                    help="number of users: K")
+
 parser.add_argument('--local_data', type=int,
                     help="local dataset: B")
 parser.add_argument('--batch_size', type=int, default=128,
@@ -45,7 +44,7 @@ parser.add_argument('--total_steps', type=int, default=200,
 parser.add_argument('--local_ep', type=int, default=1,
                     help="the number of local epochs: E")
 parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedAVG', type=str)
-parser.add_argument('--qmode', default=2, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
+parser.add_argument('--qmode', default=1, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
 parser.add_argument('--update_mode', default=0, type=int, help='0: model update, 1: gradient update')

@@ -44,16 +44,12 @@ def pad_random_crop(input_size, scale_size, normalize):
         transforms.Normalize(**normalize),
     ])
     
-def iid_samples(dataset, num_users):
-    total_indices = np.arange(len(dataset))
-    np.random.shuffle(total_indices)
-
-    ds = []
-    num_data = len(dataset) // num_users
-    for i in range(num_users):
-        indices = total_indices[i*num_data:(i+1)*num_data]
-        ds.append(Subset(dataset, indices))
-    return ds
+def random_split_clients(dataset, n_clients):
+    m = len(dataset) // n_clients
+    indices = np.random.permutation(len(dataset))
+    client_indices = {i: indices[i * m:(i + 1) * m].tolist() for i in range(n_clients)}
+    client_datasets = [ Subset(dataset, client_indices[client_id]) for client_id in range(n_clients)] 
+    return client_datasets
 
 def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
     labels = np.array(dataset.dataset.targets)[dataset.indices.astype(int)]
@@ -99,9 +95,10 @@ def get_cifar10_data(args, num_clients):
                                                         scale_size=32, normalize=norm),)
     if args.niid:
         train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
+        test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
     else:
-        train_ds_clients = iid_samples(train_ds, num_clients)
-        test_ds_clients = iid_samples(test_ds, num_clients)
+        train_ds_clients = random_split_clients(train_ds, num_clients)
+        test_ds_clients = random_split_clients(test_ds, num_clients)
     return train_ds_clients, test_ds_clients, train_ds, test_ds
 
 def get_mnist_data(args, num_clients):
@@ -119,9 +116,10 @@ def get_mnist_data(args, num_clients):
                                                     scale_size=cfg['input_size'], normalize=norm))
     if args.niid:
         train_ds_clients = dirichlet_sample(train_ds, num_clients, 10)
+        test_ds_clients = dirichlet_sample(test_ds, num_clients, 10)
     else:
-        train_ds_clients = iid_samples(train_ds, num_clients)
-        test_ds_clients = iid_samples(test_ds, num_clients)
+        train_ds_clients = random_split_clients(train_ds, num_clients)
+        test_ds_clients = random_split_clients(test_ds, num_clients)
     return train_ds_clients, test_ds_clients, train_ds, test_ds
 
 def get_imagenet_data(args,  num_clients):
@@ -141,7 +139,10 @@ def get_imagenet_data(args,  num_clients):
 
     train_ds = HFDatasetWrapper(train_subset, transform=train_transform)
     test_ds = HFDatasetWrapper(val_subset, transform=val_transform)
-    if not args.niid:
+    if  args.niid:
+        train_ds_clients = dirichlet_sample(train_ds, num_clients, 50)
+        test_ds_clients = dirichlet_sample(test_ds, num_clients, 50)
+    else:
         train_ds_clients = random_split_clients(train_ds, num_clients)
         test_ds_clients = random_split_clients(test_ds, num_clients)
     return train_ds_clients, test_ds_clients, train_ds, test_ds

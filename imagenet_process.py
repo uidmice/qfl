@@ -139,7 +139,6 @@ class SubclassFilter(ImageFolder):
 
 def random_split_clients(dataset, n_clients):
     m = len(dataset) // n_clients
-
     indices = np.random.permutation(len(dataset))
     client_indices = {i: indices[i * m:(i + 1) * m].tolist() for i in range(n_clients)}
     client_datasets = [ Subset(dataset, client_indices[client_id]) for client_id in range(n_clients)] 

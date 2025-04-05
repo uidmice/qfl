@@ -54,7 +54,7 @@ def shift(input, s, target_bitwidth):
     bw = get_bitwidth(input)
     range = 2**target_bitwidth - 1
     if bw > target_bitwidth:
-        return int8_clip(RoundShift(input, bw-target_bitwidth), range), [2**(bw - target_bitwidth) * s[0]]
+        return int8_clip(RoundShift(input, bw-target_bitwidth), range), [2**(bw - target_bitwidth) * s]
     return input, s
 
     
@@ -64,7 +64,7 @@ def int8_clip(input, clip_val=127):
 def fp_quant(input, bitwidth):
     input_range = torch.max(torch.abs(input))
     unround = input/input_range*(2**bitwidth - 1)
-    return deterministic_round(unround), [input_range/(2**bitwidth - 1)]
+    return deterministic_round(unround), input_range/(2**bitwidth - 1)
 
 def fp_quant_stochastic(input, bitwidth):
     if torch.isnan(input).any():
@@ -72,10 +72,10 @@ def fp_quant_stochastic(input, bitwidth):
     
     input_range = torch.max(torch.abs(input))
     if input_range == 0:
-        return input, [0]
+        return input, 0.0
     unround = input/input_range*(2**bitwidth - 1)
 
-    return stochastic_round(unround), [input_range/(2**bitwidth - 1)]
+    return stochastic_round(unround), input_range/(2**bitwidth - 1)
     
 def stochastic_round(t):
     if torch.isnan(t).any():
