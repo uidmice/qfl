@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from  src.qm import  *
+from src.qm import _collect_state_dict, _load_state_dict
 import collections, time
 from src.ops import *
 from src.meters import accuracy, AverageMeter
-from src.lock import *
 from src.resnet import ResLayer, QResLayer
 
 model_dict = {
@@ -56,32 +56,40 @@ class Qnet(nn.Module):
                 x=layer.backward(x)
 
     def state_dict(self):
-        state_dict=collections.OrderedDict()
-        for idx,l in enumerate(self.forward_layers):
-            if hasattr(l,'weight'):
-                layer_prefix = 'layers.'+str(idx)+'.'
-                if hasattr(l, 'weight_scale'):
-                    state_dict[layer_prefix+'weight']=l.weight
-                    state_dict[layer_prefix+'weight_scale']=l.weight_scale
-                else:
-                    state_dict[layer_prefix+'weight']=l.weight
-                    state_dict[layer_prefix+'bias']=l.bias
-                    state_dict[layer_prefix+'running_mean']=l.running_mean
-                    state_dict[layer_prefix+'running_var']=l.running_var
-        return state_dict
+        state = collections.OrderedDict()
+        for idx, layer in enumerate(self.forward_layers):
+            prefix = 'layers.' + str(idx) + '.'
+            state.update(_collect_state_dict(layer, prefix))
+        return state
+        # state_dict=collections.OrderedDict()
+        # for idx,l in enumerate(self.forward_layers):
+        #     if hasattr(l,'weight'):
+        #         layer_prefix = 'layers.'+str(idx)+'.'
+        #         if hasattr(l, 'weight_scale'):
+        #             state_dict[layer_prefix+'weight']=l.weight
+        #             state_dict[layer_prefix+'weight_scale']=l.weight_scale
+        #         else:
+        #             state_dict[layer_prefix+'weight']=l.weight
+        #             state_dict[layer_prefix+'bias']=l.bias
+        #             state_dict[layer_prefix+'running_mean']=l.running_mean
+        #             state_dict[layer_prefix+'running_var']=l.running_var
+        # return state_dict
 
     def load_state_dict(self, state_dict): #load fp state_dict
-        for idx,l in enumerate(self.forward_layers):
-            if hasattr(l,'weight'):
-                layer_prefix = 'layers.'+str(idx)+'.'
-                if hasattr(l,'weight_scale'):
-                    l.weight = state_dict[layer_prefix+'weight']
-                    l.weight, l.weight_scale=l.quantizer(l.weight)
-                else:
-                    l.weight = state_dict[layer_prefix+'weight']
-                    l.bias = state_dict[layer_prefix+'bias']
-                    l.running_mean = state_dict[layer_prefix+'running_mean']
-                    l.running_var = state_dict[layer_prefix+'running_var']
+        for idx, layer in enumerate(self.forward_layers):
+            prefix = 'layers.' + str(idx) + '.'
+            _load_state_dict(layer, state_dict, prefix)
+        # for idx,l in enumerate(self.forward_layers):
+        #     if hasattr(l,'weight'):
+        #         layer_prefix = 'layers.'+str(idx)+'.'
+        #         if hasattr(l,'weight_scale'):
+        #             l.weight = state_dict[layer_prefix+'weight']
+        #             l.weight, l.weight_scale=l.quantizer(l.weight)
+        #         else:
+        #             l.weight = state_dict[layer_prefix+'weight']
+        #             l.bias = state_dict[layer_prefix+'bias']
+        #             l.running_mean = state_dict[layer_prefix+'running_mean']
+        #             l.running_var = state_dict[layer_prefix+'running_var']
 
 
 class nn_q(Qnet):

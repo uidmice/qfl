@@ -1,7 +1,7 @@
 import torch 
 from torch import nn
 import torch.nn.functional as F
-from src.ops import StoShift
+import collections
 
 def combine_scale(s1, s2):
     return s1 * s2
@@ -320,3 +320,47 @@ class QBatchNorm2d(nn.Module):
         self.running_mean = self.running_mean.to(device)
         self.running_var = self.running_var.to(device)
         return self
+    
+
+def _collect_state_dict(module, prefix=''):
+    state = collections.OrderedDict()
+    # If this module is a "leaf" module with custom state:
+    if hasattr(module, 'weight'):
+        if hasattr(module, 'weight_scale'):
+            state[prefix + 'weight'] = module.weight
+            state[prefix + 'weight_scale'] = module.weight_scale
+        else:
+            state[prefix + 'weight'] = module.weight
+            if hasattr(module, 'bias'):
+                state[prefix + 'bias'] = module.bias
+            if hasattr(module, 'running_mean'):
+                state[prefix + 'running_mean'] = module.running_mean
+            if hasattr(module, 'running_var'):
+                state[prefix + 'running_var'] = module.running_var
+    # Recurse into children.
+    for name, child in module.named_children():
+        child_prefix = prefix + name + '.'
+        state.update(_collect_state_dict(child, child_prefix))
+    return state
+
+def _load_state_dict(module, state, prefix=''):
+    """
+    Recursively loads state into a module and its children.
+    It looks for keys with the given prefix and assigns them to the appropriate attributes.
+    """
+    if hasattr(module, 'weight'):
+        if hasattr(module, 'weight_scale'):
+            module.weight = state[prefix + 'weight']
+            module.weight, module.weight_scale = module.quantizer(module.weight)
+        else:
+            module.weight = state[prefix + 'weight']
+            if prefix + 'bias' in state:
+                module.bias = state[prefix + 'bias']
+            if prefix + 'running_mean' in state:
+                module.running_mean = state[prefix + 'running_mean']
+            if prefix + 'running_var' in state:
+                module.running_var = state[prefix + 'running_var']
+    # Recurse into children.
+    for name, child in module.named_children():
+        child_prefix = prefix + name + '.'
+        _load_state_dict(child, state, child_prefix)
