@@ -52,7 +52,11 @@ def random_split_clients(dataset, n_clients):
     return client_datasets
 
 def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
-    labels = np.array(dataset.targets)[dataset.indices.astype(int)]
+
+    if not hasattr(dataset, 'targets'):
+        labels = np.array([dataset[i][1] for i in range(len(dataset))])
+    else:
+        labels = np.array(dataset.targets)[dataset.indices.astype(int)]
     
     # Create a list of indices for each class
     indices_per_class = [[] for _ in range(num_classes)]
