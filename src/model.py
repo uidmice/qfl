@@ -3,11 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from  src.qm import  *
-from src.qm import _collect_state_dict, _load_state_dict
+from src.qm import _collect_state_dict, _load_state_dict, _load_state_dict_dequant
 import collections, time
 from src.ops import *
 from src.meters import accuracy, AverageMeter
 from src.resnet import ResLayer, QResLayer
+from src.lock  import *
 
 model_dict = {
     0: [[32, 3, 1], [64, 3, 1], "M",'F','D', 128],
@@ -161,23 +162,7 @@ class nn_q(Qnet):
     def dequantize(self):
         fp_model = nn_fp(self.channel, self.img_size, self.out_dim, self.cfg, self.device, bias=self.use_bias)
         state_dict = self.state_dict()
-        new_dict = {}
-        for idx,l in enumerate(fp_model.layers):
-            if hasattr(l,'weight'):
-                layer_prefix = 'layers.'+str(idx)+'.'
-                if layer_prefix+'weight_scale' in state_dict:
-                    data = state_dict[layer_prefix+'weight'] * state_dict[layer_prefix+'weight_scale']
-                    if l.bias:
-                        new_dict[layer_prefix+'weight']=data[:,:-1]
-                        new_dict[layer_prefix+'bias']=data[:,-1]
-                    else:
-                        new_dict[layer_prefix+'weight']=data
-                else:
-                    new_dict[layer_prefix+'weight']=state_dict[layer_prefix+'weight']
-                    new_dict[layer_prefix+'bias']=state_dict[layer_prefix+'bias']
-                    new_dict[layer_prefix+'running_mean']=state_dict[layer_prefix+'running_mean']
-                    new_dict[layer_prefix+'running_var']=state_dict[layer_prefix+'running_var']
-        fp_model.load_state_dict(new_dict)
+        _load_state_dict_dequant(fp_model, state_dict)
         return fp_model
     
 

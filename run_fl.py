@@ -11,7 +11,7 @@ from fl_client import *
 parser = argparse.ArgumentParser()
 
 
-parser.add_argument('--num_clients', type=int, default=5,
+parser.add_argument('--num_clients', type=int, default=20,
                     help="number of users: K")
 parser.add_argument('--batch_size', type=int, default=128,
                     help="local batch size: B")
@@ -33,13 +33,13 @@ parser.add_argument('--niid', action='store_true', default=False)
 #                     help='saved folder')
 parser.add_argument('--dataset', type=str, default='imagenet',
                     help='dataset dir')
-parser.add_argument('--model', default=9, type=int)
+parser.add_argument('--model', default=10, type=int)
 
-parser.add_argument('--total_steps', type=int, default=80,
+parser.add_argument('--total_steps', type=int, default=100,
                     help="number of rounds of training")
-parser.add_argument('--local_ep', type=int, default=12,
+parser.add_argument('--local_ep', type=int, default=3,
                     help="the number of local epochs: E")
-parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedAVG', type=str)
+parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedQT', type=str)
 parser.add_argument('--qmode', default=1, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)

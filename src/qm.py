@@ -364,3 +364,20 @@ def _load_state_dict(module, state, prefix=''):
     for name, child in module.named_children():
         child_prefix = prefix + name + '.'
         _load_state_dict(child, state, child_prefix)
+
+def _load_state_dict_dequant(module, state, prefix=''):
+    if hasattr(module, 'weight'):
+        if prefix + 'weight_scale' in state:
+            fp_weight = state[prefix + 'weight'] * state[prefix + 'weight_scale']
+            module.weight = nn.Parameter(fp_weight)
+        else:
+            module.weight = nn.Parameter(state[prefix + 'weight'])
+        if prefix + 'bias' in state:
+            module.bias = nn.Parameter(state[prefix + 'bias'])
+        if prefix + 'running_mean' in state:
+            module.running_mean.data.copy_(state[prefix + 'running_mean'])
+        if prefix + 'running_var' in state:
+            module.running_var.data.copy_(state[prefix + 'running_var'])
+    for name, child in module.named_children():
+        child_prefix = prefix + name + '.'
+        _load_state_dict_dequant(child, state, child_prefix)
