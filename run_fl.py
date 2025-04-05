@@ -39,7 +39,7 @@ parser.add_argument('--total_steps', type=int, default=100,
                     help="number of rounds of training")
 parser.add_argument('--local_ep', type=int, default=3,
                     help="the number of local epochs: E")
-parser.add_argument('--algorithm', choices=['FedAVG', 'FedQNN', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedQT', type=str)
+parser.add_argument('--algorithm', choices=['FedAVG', 'FedProx', 'FedQT', 'FedQT-BA', 'FedPAQ', 'FedPAQ-BA', 'Q-FedUpdate', 'Q-FedUpdate-BA'], default='FedQT', type=str)
 parser.add_argument('--qmode', default=1, type=int, help='model training: 0: NITI, 1: use int+fp calculation, 2: fp')
 parser.add_argument('--quantize_comm', action='store_true', default=False)
 parser.add_argument('--adaptive_bitwidth', action='store_true', default=False)
@@ -56,6 +56,7 @@ parser.add_argument('--use_bn', action='store_true', default=False)
 
 parser.add_argument('--lr', type=float, default=0.05, metavar='LR')
 parser.add_argument('--momentum', type=float, default=0, metavar='M')
+parser.add_argument('--weight_decay', type=float, default=0, metavar='WD')
 parser.add_argument('--device', type=str, default='cuda', metavar='D',)
 parser.add_argument('--num_workers', type=int, default=0, metavar='N',)
 
@@ -315,6 +316,9 @@ if __name__ == '__main__':
 
     if args.algorithm == 'FedAVG':
         args.qmode = 2
+    if args.algorithm == 'FedProx':
+        args.qmode = 2
+        args.weight_decay = 0.01
     elif args.algorithm == 'FedPAQ':
         args.qmode = 2
         args.update_mode = 1

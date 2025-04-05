@@ -95,7 +95,8 @@ class Qnet(nn.Module):
 
 class nn_q(Qnet):
     def __init__(self, channel, img_size, out_dim, cfg, loss, 
-                 weight_update, forward_shift, backward_shift, input_quantizer, quantizer, initialize, device, use_bias=False):
+                 weight_update, forward_shift, backward_shift, input_quantizer, quantizer, 
+                 initialize, device, weight_decay, use_bias=False):
         super(nn_q, self).__init__(loss, input_quantizer)
         self.channel = channel
         self.img_size = img_size
@@ -158,6 +159,7 @@ class nn_q(Qnet):
         ]
         self.use_bias = use_bias
         self.forward_layers = nn.Sequential(*layers).to(device)
+        self.weight_decay = weight_decay
 
     def dequantize(self):
         fp_model = nn_fp(self.channel, self.img_size, self.out_dim, self.cfg, self.device, bias=self.use_bias)
@@ -205,7 +207,7 @@ class nn_q(Qnet):
 
 
 class nn_fp(nn.Module):
-    def __init__(self, channel, img_size, out_dim, cfg, device, lr=0.01, momentum=0.9, bias=False):
+    def __init__(self, channel, img_size, out_dim, cfg, device, lr=0.01, momentum=0.9, weight_decay=0,  bias=False):
         super(nn_fp, self).__init__()
         self.channel = channel
         self.img_size = img_size
@@ -261,10 +263,10 @@ class nn_fp(nn.Module):
             nn.Linear(ldim, out_dim,bias=False)
         ]
         self.layers = nn.Sequential(*layers).to(device)
-        self.setup_optimizer(lr, momentum)
+        self.setup_optimizer(lr, momentum, weight_decay)
 
-    def setup_optimizer(self, lr, momentum):
-        self.optimizer = optim.SGD(self.parameters(), lr=lr, momentum=momentum)
+    def setup_optimizer(self, lr, momentum, weight_decay):
+        self.optimizer = optim.SGD(self.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
         self.scheduler = StepLR(self.optimizer, step_size=50, gamma=0.5)
 
     def forward(self, x):
@@ -322,7 +324,7 @@ def NITI_weight_update(w, ws, g, gs, m, range):
     return int8_clip(w, range), ws
  
     
-def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
+def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr, weight_decay=0):
 
     if lock:
         g = g * gs * lr/bs / ws
@@ -332,16 +334,16 @@ def fp_weight_update(w, ws, g, gs, bitwidth, bs, lr):
     g = g * gs * lr/bs  
     if g.abs().max() > wn.abs().max()/4:
         g = g * wn.abs().max()/g.abs().max() / 4
-    wn = wn - g
+    wn = wn *(1 - weight_decay) - g
     # if lock:
     #     wt = stochastic_round(wn / ws[0])
     #     return int8_clip(wt, 2**bitwidth - 1)
     wt, scale = fp_quant_stochastic(wn, bitwidth)
     return int8_clip(wt, 2**bitwidth - 1), scale
 
-def build_fp_model(in_channel, img_dim, out_dim, model_id, lr, device, momentum=0, use_bn=False):
+def build_fp_model(in_channel, img_dim, out_dim, model_id, lr, device, momentum=0, weight_decay=0, use_bn=False):
     cfg = model_dict[model_id]
-    model = model = nn_fp(in_channel, img_dim, out_dim, cfg, device, lr, momentum, use_bn)
+    model = model = nn_fp(in_channel, img_dim, out_dim, cfg, device, lr, momentum, weight_decay, use_bn)
     return model
 
 def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, device, Ab=8, Eb=8, stochastic=True,loss='CE'):
@@ -393,7 +395,8 @@ def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, device, Ab=8, E
 
 def build_model(in_channel, img_dim, out_dim, args):
     if args.qmode == 2:
-        model = build_fp_model(in_channel, img_dim, out_dim, args.model, args.lr, args.device, momentum=args.momentum, use_bn=False)
+        model = build_fp_model(in_channel, img_dim, out_dim, args.model, args.lr, args.device, momentum=args.momentum, 
+                               weight_decay=args.weight_decay, use_bn=False)
     else:
         loss = 'CE'
         if args.qmode == 0: # NITI
