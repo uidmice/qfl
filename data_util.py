@@ -2,7 +2,7 @@ import torch
 import torchvision.transforms as transforms
 from torchvision import datasets
 from torch.utils.data import Dataset, DataLoader, Subset
-from imagenet_process import get_or_create_selected_classes, split_dataset, random_split_clients, MultiAugmentDataset
+from imagenet_process import get_or_create_selected_classes, random_split_clients, MultiAugmentDataset
 from datasets import load_dataset
 import numpy as np
 import csv, shutil

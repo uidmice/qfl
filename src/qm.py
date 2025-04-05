@@ -55,6 +55,12 @@ class QLinear(nn.Module):
         self.weight, self.weight_scale = self.weight_update(self.weight, self.weight_scale, self.grad, self.grad_scale)
 
         return out, out_s
+    
+    def to(self, device):
+        super().to(device)
+        self.weight = self.weight.to(device)
+        self.weight_scale = self.weight_scale.to(device)
+        return self
 
 class QConv2d(nn.Module):
     '''
@@ -100,6 +106,12 @@ class QConv2d(nn.Module):
 
         self.weight, self.weight_scale = self.weight_update(self.weight, self.weight_scale, self.grad, self.grad_scale)
         return out, out_s
+    
+    def to(self, device):
+        super().to(device)
+        self.weight = self.weight.to(device)
+        self.weight_scale = self.weight_scale.to(device)
+        return self
         
 
 class QReLU(nn.Module):
@@ -301,3 +313,10 @@ class QBatchNorm2d(nn.Module):
         self.bias *= b1
     
         return self.backward_rescale(grad_act, 1)
+    def to(self, device):
+        super().to(device)
+        self.weight = self.weight.to(device)
+        self.bias = self.bias.to(device)
+        self.running_mean = self.running_mean.to(device)
+        self.running_var = self.running_var.to(device)
+        return self

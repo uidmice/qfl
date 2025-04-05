@@ -80,23 +80,6 @@ def get_or_create_selected_classes_dir(train_dir, save_path='selected_classes.js
             print(f"Saved {len(selected_classes)} classes to {save_path}")
     return selected_classes
 
-def split_dataset(dataset, n_clients, data_per_client=None):
-    total = len(dataset)
-    indices = list(range(total))
-    random.shuffle(indices)
-    client_datasets = []
-    split_size = total // n_clients
-    if data_per_client and data_per_client < split_size:
-        split_size = data_per_client
-
-    for i in range(n_clients):
-        if i == n_clients - 1:
-            client_indices = indices[i * split_size:]
-        else:
-            client_indices = indices[i * split_size: (i + 1) * split_size]
-        client_datasets.append(dataset.select(client_indices))
-    
-    return client_datasets
 
 
 class SubclassFilter(ImageFolder):
