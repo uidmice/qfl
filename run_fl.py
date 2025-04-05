@@ -17,6 +17,7 @@ parser.add_argument('--batch_size', type=int, default=128,
                     help="local batch size: B")
 parser.add_argument('--log_interval', type=int, default=5, metavar='N',
                 help='how many batches to wait before logging training status')
+parser.add_argument('--local_data', type=int)
 
 
 parser.add_argument('--log-interval', type=int, default=1, metavar='N',
@@ -174,6 +175,14 @@ def exp(root, config, seed):
     
     train_ds_clients, test_ds_clients, train_ds, test_ds  = get_fl_dataset(args, args.num_clients)
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=args.num_workers)
+    if args.local_data:
+        subset_data = []
+        for ds in train_ds_clients:
+            underlying_dataset = ds.dataset
+            random_indices = np.random.choice(ds.indices, args.local_data, replace=False)
+            subset_data.append(Subset(underlying_dataset, random_indices))
+        train_ds_clients = subset_data
+        
     
     
     global_model = build_fp_model(dataset_cfg[args.dataset]['input_channel'], 
