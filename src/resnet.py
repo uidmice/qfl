@@ -98,6 +98,7 @@ class QBasicBlock(nn.Module):
         self.bn2.to(device)
         if self.downsample is not None:
             self.downsample.to(device)
+        return self
             
 class ResLayer(nn.Module):
     def __init__(self, in_channels, out_channels, num_blocks, stride):
@@ -139,6 +140,7 @@ class QResLayer(nn.Module):
         super().to(device)
         for block in self.blocks:
             block.to(device)
+        return self
 
 
 class ResNet18Tiny(nn.Module):
