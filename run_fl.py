@@ -179,7 +179,7 @@ def exp(root, config, seed):
         subset_data = []
         for ds in train_ds_clients:
             underlying_dataset = ds.dataset
-            random_indices = np.random.choice(ds.indices, max(args.local_data, len(ds.indices)), replace=False)
+            random_indices = np.random.choice(ds.indices, min(args.local_data, len(ds.indices)), replace=False)
             subset_data.append(Subset(underlying_dataset, random_indices))
         train_ds_clients = subset_data
         
