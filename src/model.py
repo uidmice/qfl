@@ -62,7 +62,7 @@ class Qnet(nn.Module):
                 layer_prefix = 'layers.'+str(idx)+'.'
                 if hasattr(l, 'weight_scale'):
                     state_dict[layer_prefix+'weight']=l.weight
-                    state_dict[layer_prefix+'weight_scale']=l.weight_scale[0]
+                    state_dict[layer_prefix+'weight_scale']=l.weight_scale
                 else:
                     state_dict[layer_prefix+'weight']=l.weight
                     state_dict[layer_prefix+'bias']=l.bias
