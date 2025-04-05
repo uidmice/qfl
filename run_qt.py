@@ -85,9 +85,13 @@ def exp(root, seed):
                         dataset_cfg[args.dataset]['output_size'], 
                         args).to(args.device)
     
-    model.load_state_dict(fp_model.state_dict())
-    for name, param in model.named_parameters():
-        print(f"{name} is on {param.device}")
+
+    for name, module in model.named_modules():
+        try:
+            device = next(module.parameters()).device
+        except StopIteration:
+            device = "No parameters"
+        print(f"Module {name} is on {device}")
 
 
     best_prec1 = 0
