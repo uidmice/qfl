@@ -100,42 +100,42 @@ class nn_q(Qnet):
         ldim = 0
         for x in cfg:
             if x == 'M':
-                layers += [QMaxpool2d(kernel_size=2, stride=2)]
+                layers += [QMaxpool2d(kernel_size=2, stride=2).to(device)]
                 img_size = img_size // 2
             elif isinstance(x, list):
                 if x[0] == 'R':
                     layers += [QResLayer(channel, x[1], x[2], x[3], 3, 1,
-                  quantizer, weight_update, forward_shift, backward_shift)]
+                  quantizer, weight_update, forward_shift, backward_shift).to(device)]
                     channel = x[1]
                     img_size = img_size // x[3]
                 else:
                     layers += [QConv2d(channel, x[0], kernel_size=x[1], stride=1, padding=x[2], quantizer=quantizer, 
-                                    weight_update=weight_update, initialize=initialize)]
+                                    weight_update=weight_update, initialize=initialize).to(device)]
                     channel = x[0]
                     if x[-1] == 'N':
-                        layers += [QBatchNorm2d(channel, weight_update, forward_shift, backward_shift)]
+                        layers += [QBatchNorm2d(channel, weight_update, forward_shift, backward_shift).to(device)]
                     layers += [QReLU(forward_shift, backward_shift)]
                     img_size = (img_size + 2*x[2] - x[1]) + 1
             elif x == 'F':
                 layers += [QFlat()]
             elif x == 'D':
-                layers += [QDropout(0.1)]
+                layers += [QDropout(0.1).to(device)]
             elif x == 'A':
-                layers += [QGlobalPool2d(forward_shift, backward_shift)]
+                layers += [QGlobalPool2d(forward_shift, backward_shift).to(device)]
                 img_size = 1
             elif x == 'N':
-                layers += [QBatchNorm2d(channel, weight_update, forward_shift, backward_shift)]
+                layers += [QBatchNorm2d(channel, weight_update, forward_shift, backward_shift).to(device)]
             else:
                 if ldim == 0:
                     if img_size > 0:
-                        layers += [QLinear(channel * img_size * img_size, x, quantizer, weight_update, initialize, bias=use_bias),
+                        layers += [QLinear(channel * img_size * img_size, x, quantizer, weight_update, initialize, bias=use_bias).to(device),
                             QReLU(forward_shift, backward_shift)]
                     else:
-                        layers += [QLinear(channel, x, quantizer, weight_update, initialize,bias=use_bias),
+                        layers += [QLinear(channel, x, quantizer, weight_update, initialize,bias=use_bias).to(device),
                             QReLU(forward_shift, backward_shift)]
                     ldim = x
                 else:
-                    layers += [QLinear(ldim, x, quantizer, weight_update, initialize,bias=use_bias),
+                    layers += [QLinear(ldim, x, quantizer, weight_update, initialize,bias=use_bias).to(device),
                            QReLU(forward_shift, backward_shift)]
                     ldim = x
 
@@ -145,7 +145,7 @@ class nn_q(Qnet):
             else:
                 ldim = channel
         layers += [
-            QLinear(ldim, out_dim, quantizer, weight_update, initialize,bias=use_bias)
+            QLinear(ldim, out_dim, quantizer, weight_update, initialize,bias=use_bias).to(device)
         ]
         self.use_bias = use_bias
         self.forward_layers = nn.Sequential(*layers).to(device)

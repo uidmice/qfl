@@ -88,6 +88,16 @@ class QBasicBlock(nn.Module):
         
         e = e1[0] * e1[1] + e[0] * e[1]
         return self.backward_rescale(e, 1)
+    
+    def to(self, device):
+        super().to(device)
+        self.conv1.to(device)
+        self.bn1.to(device)
+        self.relu.to(device)
+        self.conv2.to(device)
+        self.bn2.to(device)
+        if self.downsample is not None:
+            self.downsample.to(device)
             
 class ResLayer(nn.Module):
     def __init__(self, in_channels, out_channels, num_blocks, stride):
@@ -124,6 +134,11 @@ class QResLayer(nn.Module):
         for block in reversed(self.blocks):
             err = block.backward(err)
         return err
+    
+    def to(self, device):
+        super().to(device)
+        for block in self.blocks:
+            block.to(device)
 
 
 class ResNet18Tiny(nn.Module):
