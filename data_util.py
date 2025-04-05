@@ -55,8 +55,10 @@ def dirichlet_sample(dataset, num_clients, num_classes, alpha=0.5):
 
     if not hasattr(dataset, 'targets'):
         labels = np.array([dataset[i][1] for i in range(len(dataset))])
-    else:
+    elif hasattr(dataset, 'indices'):
         labels = np.array(dataset.targets)[dataset.indices.astype(int)]
+    else:
+        labels = np.array(dataset.targets)
     
     # Create a list of indices for each class
     indices_per_class = [[] for _ in range(num_classes)]
@@ -189,6 +191,8 @@ def get_femnist_data(args):
     test_ds_clients = []
     ttx = []
     tty = []
+    all_train_x = []
+    all_train_y = []
 
     for c in train_clients:
         train_ds_clients.append(DatasetFEMNIST(train_data[c]['x'], train_data[c]['y']))
@@ -197,7 +201,10 @@ def get_femnist_data(args):
         test_ds_clients.append(DatasetFEMNIST(tx, ty))
         ttx.extend(tx)
         tty.extend(ty)
-    return train_ds_clients, test_ds_clients, DatasetFEMNIST(ttx, tty)
+        all_train_x.extend(train_data[c]['x'])
+        all_train_y.extend(train_data[c]['y'])
+
+    return train_ds_clients, test_ds_clients, DatasetFEMNIST(all_train_x, all_train_y), DatasetFEMNIST(ttx, tty)
 
 class Dataset_Custom(Dataset):
     def __init__(self, data, hist_len):
