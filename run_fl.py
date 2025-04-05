@@ -175,7 +175,7 @@ def exp(root, config, seed):
     
     train_ds_clients, test_ds_clients, train_ds, test_ds  = get_fl_dataset(args, args.num_clients)
     test_loader = DataLoader(test_ds, batch_size=128, shuffle=False, num_workers=args.num_workers)
-    if args.local_data:
+    if args.local_data and args.dataset != 'femnist':
         subset_data = []
         for ds in train_ds_clients:
             underlying_dataset = ds.dataset
@@ -183,7 +183,6 @@ def exp(root, config, seed):
             subset_data.append(Subset(underlying_dataset, random_indices))
         train_ds_clients = subset_data
         
-    
     
     global_model = build_fp_model(dataset_cfg[args.dataset]['input_channel'], 
                         dataset_cfg[args.dataset]['input_size'], 
