@@ -8,6 +8,7 @@ from torch.utils.data import Subset, DataLoader, Dataset
 import numpy as np
 import matplotlib.pyplot as plt
 from torchvision.utils import make_grid
+from collections import defaultdict
 
 # dataset = load_dataset("benjamin-paine/imagenet-1k-64x64")
 # val_dir = 'data/tiny-imagenet-200/val'
@@ -97,24 +98,6 @@ def split_dataset(dataset, n_clients, data_per_client=None):
     
     return client_datasets
 
-def to_pil_image(img):
-    # If the image is a dict (common with datasets library),
-    # try to convert it using the "bytes" or "path" keys.
-    if isinstance(img, dict):
-        if "bytes" in img:
-            return Image.open(io.BytesIO(img["bytes"]))
-        elif "path" in img:
-            return Image.open(img["path"])
-        else:
-            raise ValueError("Image dict does not contain 'bytes' or 'path'.")
-    # If it's already a PIL Image, return it as is.
-    if isinstance(img, Image.Image):
-        return img
-    # Optionally, if it's a numpy array or something else, convert it.
-    try:
-        return Image.fromarray(img)
-    except Exception as e:
-        raise TypeError(f"Unsupported image type: {type(img)}") from e
 
 class SubclassFilter(ImageFolder):
     def __init__(self, root, classes_to_keep, transform=None):
@@ -143,6 +126,41 @@ def random_split_clients(dataset, n_clients):
     client_indices = {i: indices[i * m:(i + 1) * m].tolist() for i in range(n_clients)}
     client_datasets = [ Subset(dataset, client_indices[client_id]) for client_id in range(n_clients)] 
     return client_datasets
+
+def dirichlet_split(dataset, num_clients, num_classes, alpha=0.5):
+
+    num_samples = len(dataset)
+    
+    labels = np.array([dataset[i][1] for i in range(num_samples)])
+    
+    class_indices = defaultdict(list)
+    for idx, label in enumerate(labels):
+        class_indices[label].append(idx)
+    
+    client_indices = {client: [] for client in range(num_clients)}
+    
+    # For each class, partition its indices among the clients.
+    for c in range(num_classes):
+        indices = np.array(class_indices[c])
+        np.random.shuffle(indices)
+        
+        proportions = np.random.dirichlet(alpha * np.ones(num_clients))
+        counts = (proportions * len(indices)).astype(int)
+        
+        # Adjust counts to ensure they sum to the total number of indices.
+        diff = len(indices) - counts.sum()
+        for i in range(diff):
+            counts[i % num_clients] += 1
+        
+        # Assign indices to each client.
+        start = 0
+        for client in range(num_clients):
+            client_indices[client].extend(indices[start:start + counts[client]].tolist())
+            start += counts[client]
+    
+    # Optionally sort indices in each client partition.
+    client_indices_list = [sorted(client_indices[i]) for i in range(num_clients)]
+    return client_indices_list
 
 class MultiAugmentDataset(Dataset):
     """

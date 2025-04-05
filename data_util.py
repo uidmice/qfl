@@ -241,7 +241,7 @@ class HFDatasetWrapper(Dataset):
 
     def __getitem__(self, index):
         # Access the sample (decoded on-demand)
-        sample = self.hf_dataset[index]
+        sample = self.hf_dataset[int(index)]
         image, label = sample["image"], sample["label"]
 
         # Optionally apply transformation to the image
