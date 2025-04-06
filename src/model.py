@@ -316,7 +316,7 @@ class nn_fp(nn.Module):
 def NITI_weight_update(w, ws, g, gs, m, range):
     int32_bitwidth = get_bitwidth(g)
     if int32_bitwidth == 0:
-        return int8_clip(w,range)
+        return int8_clip(w,range), ws
     shift = int32_bitwidth - m
     if shift > 1:
         g = StoShift(g, shift.int().item())
