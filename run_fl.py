@@ -324,7 +324,7 @@ if __name__ == '__main__':
 
     if args.algorithm == 'FedAVG':
         args.qmode = 2
-    if args.algorithm == 'FedProx':
+    elif args.algorithm == 'FedProx':
         args.qmode = 2
         args.weight_decay = 0.01
     elif args.algorithm == 'FedPAQ':
