@@ -346,7 +346,7 @@ def build_fp_model(in_channel, img_dim, out_dim, model_id, lr, device, momentum=
     model = model = nn_fp(in_channel, img_dim, out_dim, cfg, device, lr, momentum, weight_decay, use_bn)
     return model
 
-def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, device, Ab=8, Eb=8, stochastic=True,loss='CE'):
+def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, device, weight_decay=0, Ab=8, Eb=8, stochastic=True,loss='CE'):
     cfg = model_dict[model_id]
     w_quant = lambda x: fp_quant(x, Wb - 1)
     if stochastic:
@@ -365,11 +365,11 @@ def build_q_model(in_channel, img_dim, out_dim, model_id, Wb, batch_size, lr, de
     a_rescale = lambda a, s: a_quant(a*s)
     e_rescale = lambda a, s: e_quant(a*s)
     model = nn_q(in_channel, img_dim, out_dim, cfg, loss, weight_update, a_rescale, e_rescale, 
-                a_quant, w_quant, 'uniform', device, use_bias=False)
+                a_quant, w_quant, 'uniform', device, weight_decay, use_bias=False)
     return model
     
 
-def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, device, Ab=8, Eb=8, m=5, loss='CE'):
+def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, device, weight_decay=0, Ab=8, Eb=8, m=5, loss='CE'):
     cfg = model_dict[model_id]
     if Wb == 1:
         w_quant = lambda x: torch.where(x > 0, torch.tensor(1), torch.tensor(-1)), [1.0]
@@ -390,7 +390,7 @@ def build_NITI_model(in_channel, img_dim, out_dim, model_id, Wb, device, Ab=8, E
     e_shift = lambda a, s : shift(a, s, Eb - 1)
     model = nn_q(
         in_channel, img_dim, out_dim, cfg, loss, weight_update, a_shit, e_shift, 
-                a_quant, w_quant, 'uniform',  device, use_bias=False)
+                a_quant, w_quant, 'uniform',  device, weight_decay=weight_decay, use_bias=False)
     return model
 
 def build_model(in_channel, img_dim, out_dim, args):
